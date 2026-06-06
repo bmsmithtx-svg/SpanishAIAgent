@@ -7,16 +7,17 @@ export async function POST(request: Request) {
 
   /*
    * Future implementation note:
-   * The SpanishAIAgent chat route must retrieve from uploaded PDF pages before
-   * answering. It must answer only when the PDFs support the response and must
-   * cite source file names and page numbers for lessons, explanations, examples,
+   * The SpanishAIAgent chat route is not active yet. The next step is
+   * retrieval-grounded AI chat that searches SpanishSourceChunk records before
+   * answering. Future chat must answer only from retrieved PDF chunks and cite
+   * source file names and page numbers for lessons, explanations, examples,
    * corrections, and practice feedback.
    */
   return NextResponse.json(
     {
       implemented: false,
       message:
-        "SpanishAIAgent chat is not implemented yet. Future responses will be grounded only in uploaded PDF sources and will cite file/page references.",
+        "SpanishAIAgent chat is not active yet. Next step: retrieval-grounded AI chat over SpanishSourceChunk records, with required PDF file/page citations.",
       citations: []
     },
     { status: 501 }

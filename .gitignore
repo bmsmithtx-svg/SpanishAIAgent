@@ -29,6 +29,19 @@ pnpm-debug.log*
 *.sqlite3
 local.db
 prisma/dev.db
+local-sources/**/*.db
+local-sources/**/*.db-journal
+local-sources/**/*.sqlite
+local-sources/**/*.sqlite3
+
+# Local Spanish source files and extraction output
+*.pdf
+local-sources/**/*.pdf
+local-sources/uploads/*
+local-sources/extracted/*
+local-sources/**/*.tmp
+local-sources/**/*.temp
+!local-sources/**/.gitkeep
 
 # Temporary and OS files
 .DS_Store

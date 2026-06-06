@@ -1,18 +1,41 @@
 import type { SpanishSourceDocument, SpanishSourcePage } from "@/types";
+import { listSourceDocuments, searchSourceChunks } from "./source-service";
 
 export async function listSpanishSourceDocuments(): Promise<SpanishSourceDocument[]> {
-  // Future work: read uploaded PDF metadata from storage or a database.
-  return [];
+  const documents = await listSourceDocuments();
+
+  return documents.map((document) => ({
+    id: document.id,
+    fileName: document.originalFileName,
+    title: document.originalFileName,
+    pageCount: document.pageCount,
+    uploadedAt: document.createdAt,
+    status:
+      document.processingStatus === "completed"
+        ? "indexed"
+        : document.processingStatus === "failed"
+          ? "failed"
+          : "parsing",
+    pages: []
+  }));
 }
 
 export async function retrieveSourcePagesForQuery(
-  _query: string
+  query: string
 ): Promise<SpanishSourcePage[]> {
-  void _query;
+  const results = await searchSourceChunks(query, 10);
 
-  /*
-   * Future work: retrieve only from uploaded Spanish PDF pages. Downstream
-   * lessons, practice items, and agent responses must cite these page records.
-   */
-  return [];
+  return results.map((result) => ({
+    id: result.pageId,
+    documentId: result.documentId,
+    pageNumber: result.pageNumber,
+    text: result.text,
+    citations: [
+      {
+        sourceFileName: result.originalFileName,
+        pageNumber: result.pageNumber,
+        snippet: result.preview
+      }
+    ]
+  }));
 }

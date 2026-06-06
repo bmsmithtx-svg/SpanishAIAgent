@@ -1,0 +1,65 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model SpanishSourceDocument {
+  id               String               @id @default(cuid())
+  fileName         String
+  originalFileName String
+  localPath        String
+  fileHash         String               @unique
+  pageCount        Int                  @default(0)
+  processingStatus String               @default("pending")
+  extractionMethod String               @default("unknown")
+  processingError  String?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  pages            SpanishSourcePage[]
+  chunks           SpanishSourceChunk[]
+
+  @@index([fileHash])
+  @@index([processingStatus])
+}
+
+model SpanishSourcePage {
+  id               String                @id @default(cuid())
+  documentId       String
+  pageNumber       Int
+  text             String                @default("")
+  extractionMethod String                @default("unknown")
+  characterCount   Int                   @default(0)
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  document         SpanishSourceDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  chunks           SpanishSourceChunk[]
+
+  @@unique([documentId, pageNumber])
+  @@index([documentId])
+  @@index([pageNumber])
+  @@index([documentId, pageNumber])
+}
+
+model SpanishSourceChunk {
+  id             String                @id @default(cuid())
+  documentId     String
+  pageId         String
+  pageNumber     Int
+  chunkIndex     Int
+  text           String
+  characterCount Int                   @default(0)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  document       SpanishSourceDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  page           SpanishSourcePage     @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@unique([pageId, chunkIndex])
+  @@index([documentId])
+  @@index([pageId])
+  @@index([pageNumber])
+  @@index([documentId, pageNumber])
+}
