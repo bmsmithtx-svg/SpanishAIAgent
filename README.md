@@ -1,6 +1,6 @@
 # SpanishAIAgent
 
-SpanishAIAgent is a dark-themed, local-first study app for PDF-grounded everyday Spanish learning. The app is designed for practical family communication and will eventually connect to an OpenAI API-powered tutor agent.
+SpanishAIAgent is a dark-themed, local-first study app for PDF-grounded everyday Spanish learning. The app is designed for practical family communication and includes a first retrieval-grounded OpenAI tutor chat.
 
 ## Strict PDF-Only Rule
 
@@ -25,10 +25,12 @@ No Spanish curriculum should be generated from general model knowledge. Imported
 3. Confirm the local database URL in `.env.local`:
 
    ```bash
+   OPENAI_API_KEY=
+   OPENAI_MODEL=gpt-4.1-mini
    DATABASE_URL="file:../local-sources/spanish-ai-agent.db"
    ```
 
-   Add local-only values as needed. Do not commit real secrets.
+   Add your real `OPENAI_API_KEY` locally. Do not commit real secrets. If `OPENAI_MODEL` is omitted, the server falls back to `gpt-4.1-mini`.
 
 4. Create and migrate the local SQLite database:
 
@@ -56,7 +58,8 @@ No Spanish curriculum should be generated from general model knowledge. Imported
 
 | Variable | Purpose |
 | --- | --- |
-| `OPENAI_API_KEY` | Future server-side OpenAI API key. The current app only checks whether it exists. |
+| `OPENAI_API_KEY` | Server-side OpenAI API key used by `/api/agent/chat`. It is never exposed to the browser. |
+| `OPENAI_MODEL` | Optional chat model. Defaults to `gpt-4.1-mini` when missing. |
 | `DATABASE_URL` | Local SQLite database URL for imported PDF metadata, pages, and chunks. |
 | `NEXT_PUBLIC_APP_NAME` | Public app name shown in API status responses. Defaults to `SpanishAIAgent`. |
 
@@ -70,6 +73,33 @@ No Spanish curriculum should be generated from general model knowledge. Imported
 6. Optional extraction snapshots are written under `local-sources/extracted/`.
 
 Duplicate PDFs are detected with a SHA-256 file hash. Uploading the same PDF twice will return the existing source record instead of creating duplicates.
+
+## Retrieval-Grounded Chat
+
+The `/chat` page and `/api/agent/chat` route implement the first working SpanishAIAgent tutor flow:
+
+1. The user sends a question or study request.
+2. The server searches `SpanishSourceChunk` records using keyword retrieval.
+3. Chunks are ranked by exact phrase match, keyword overlap, and source relevance.
+4. If no chunks are found, the app does not call OpenAI and returns a PDF-only refusal.
+5. If chunks are found, the server sends only those excerpts to OpenAI.
+6. The model is instructed to answer only from the retrieved PDF excerpts.
+7. The API returns the answer, retrieved source previews, and structured citations.
+
+The tutor must refuse requests that ask it to ignore PDFs, use outside knowledge, skip citations, or invent unsupported Spanish content.
+
+## Citations
+
+Successful tutor answers include structured citations with:
+
+- PDF file name
+- page number
+- document id
+- page id
+- chunk id
+- snippet preview
+
+The visible citation label format is `File Name, page X`.
 
 ## Git Safety
 
@@ -93,15 +123,15 @@ Only `.gitkeep` placeholders are tracked inside `local-sources/` so the folder s
 | `/library/[id]` | Inspect a source document, extracted pages, page counts, and citation labels. |
 | `/learn` | Lesson roadmap placeholder. |
 | `/practice` | Practice mode placeholder. |
-| `/chat` | Future Spanish tutor agent placeholder. |
-| `/settings` | API, database, and source ingestion readiness status. |
+| `/chat` | Retrieval-grounded Spanish tutor chat. |
+| `/settings` | API, database, retrieval, and chat readiness status. |
 | `/api/sources/upload` | Upload and extract PDF source files. |
 | `/api/sources` | List imported source documents. |
 | `/api/sources/[id]` | Load one source document. |
 | `/api/sources/[id]/pages` | Load extracted pages for one source document. |
 | `/api/sources/search` | Keyword search across extracted source chunks. |
-| `/api/agent/status` | Returns safe agent/source status without exposing secrets. |
-| `/api/agent/chat` | Placeholder chat endpoint returning a not implemented response. |
+| `/api/agent/status` | Returns safe agent/source/chat status without exposing secrets. |
+| `/api/agent/chat` | Server-side retrieval-grounded tutor chat endpoint. |
 
 ## Database Models
 
@@ -121,18 +151,25 @@ Useful indexes are included for file hashes, document/page lookups, page numbers
 
 ## Source-Grounded Architecture
 
-- `src/lib/sources` contains PDF storage, extraction, chunking, search, citation utilities, and source database helpers.
-- `src/lib/agent` is reserved for future OpenAI agent orchestration.
+- `src/lib/sources` contains PDF storage, extraction, chunking, keyword retrieval, search, citation utilities, and source database helpers.
+- `src/lib/agent` contains OpenAI client setup and agent readiness helpers.
 - `src/lib/prompts` contains the PDF-only guardrail prompt draft.
 - `src/types` contains shared source, lesson, practice, citation, and agent response types.
 
+## Current Limitations
+
+- Retrieval is keyword-based only. It does not use embeddings or semantic search yet.
+- The tutor has no long-term chat memory.
+- Daily lesson generation is not yet organized by PDF sections.
+- OCR is not implemented for scanned pages with no extractable text.
+
 ## Future Roadmap
 
-- Add retrieval over `SpanishSourceChunk` records.
-- Connect a server-side OpenAI API tutor route.
-- Require every lesson, explanation, example, and answer to include PDF file/page citations.
+- Add embeddings and semantic search over `SpanishSourceChunk`.
+- Generate daily lessons from source-backed PDF sections.
+- Improve retrieval ranking with page/section metadata.
 - Add progress tracking, practice sessions, and review history.
-- Add retrieval-grounded OpenAI tutor responses that refuse unsupported questions.
+- Add source-backed conversation drills and spaced review.
 
 ## Quality Commands
 

@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/page-header";
+import { getOpenAIModel } from "@/lib/agent/openai-client";
 import { getSourceLibraryStats } from "@/lib/sources";
 
 export const dynamic = "force-dynamic";
@@ -6,6 +7,9 @@ export const dynamic = "force-dynamic";
 export default async function SettingsPage() {
   const hasOpenAIKey = Boolean(process.env.OPENAI_API_KEY?.trim());
   const stats = await getSourceLibraryStats();
+  const retrievalReady = stats.sourceChunkCount > 0;
+  const chatReady = hasOpenAIKey && retrievalReady;
+  const model = getOpenAIModel();
 
   return (
     <div className="page">
@@ -16,7 +20,7 @@ export default async function SettingsPage() {
         badges={[
           { label: hasOpenAIKey ? "OpenAI key detected" : "OpenAI key missing", tone: hasOpenAIKey ? "green" : "rose" },
           { label: stats.databaseConnected ? "Database connected" : "Database missing", tone: stats.databaseConnected ? "green" : "rose" },
-          { label: "Agent not implemented", tone: "gold" }
+          { label: chatReady ? "Chat ready" : "Chat not ready", tone: chatReady ? "green" : "gold" }
         ]}
       />
 
@@ -33,6 +37,7 @@ export default async function SettingsPage() {
             <span className="code-pill">GET /api/agent/status</span>
             <span className="code-pill">POST /api/agent/chat</span>
             <span className="code-pill">DATABASE_URL=file:../local-sources/spanish-ai-agent.db</span>
+            <span className="code-pill">OPENAI_MODEL={model}</span>
           </div>
         </article>
 
@@ -60,8 +65,12 @@ export default async function SettingsPage() {
               <span>{stats.sourceIngestionReady ? "Ready for retrieval work" : "Needs imported PDF chunks"}</span>
             </div>
             <div className="timeline-item">
-              <strong>Agent answers</strong>
-              <span>Disabled until source grounding is available</span>
+              <strong>Retrieval</strong>
+              <span>{retrievalReady ? "Ready with indexed chunks" : "Not ready"}</span>
+            </div>
+            <div className="timeline-item">
+              <strong>Chat</strong>
+              <span>{chatReady ? "Ready for PDF-grounded tutor answers" : "Needs OpenAI key and chunks"}</span>
             </div>
           </div>
         </aside>

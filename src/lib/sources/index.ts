@@ -24,3 +24,5 @@ export type {
   RetrievedSpanishSource,
   SourceCitation
 } from "./citations";
+export { retrieveSpanishSources } from "./retrieval";
+export type { RankedSpanishSource, RetrieveSpanishSourcesOptions } from "./retrieval";

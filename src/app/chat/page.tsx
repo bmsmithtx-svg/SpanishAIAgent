@@ -1,28 +1,31 @@
-import { PlaceholderPage } from "@/components/placeholder-page";
+import { ChatInterface } from "@/components/chat-interface";
+import { PageHeader } from "@/components/page-header";
+import { getOpenAIModel } from "@/lib/agent/openai-client";
+import { getSourceLibraryStats } from "@/lib/sources";
 
-export default function ChatPage() {
+export const dynamic = "force-dynamic";
+
+export default async function ChatPage() {
+  const stats = await getSourceLibraryStats();
+  const hasOpenAIKey = Boolean(process.env.OPENAI_API_KEY?.trim());
+
   return (
-    <PlaceholderPage
-      eyebrow="Tutor chat"
-      title="Future Spanish tutor agent"
-      description="The chat surface is ready for a future server-side tutor, but answering is disabled until PDF retrieval and citations are implemented."
-      primaryTitle="Agent responses are not enabled yet"
-      primaryCopy="The future tutor must retrieve uploaded PDF pages before answering and must refuse unsupported questions instead of inventing content."
-      secondaryTitle="Agent guardrails"
-      steps={[
-        {
-          title: "Retrieve source pages",
-          copy: "Find relevant uploaded PDF pages before composing any answer."
-        },
-        {
-          title: "Cite every answer",
-          copy: "Attach file names and page numbers to lessons, explanations, examples, and corrections."
-        },
-        {
-          title: "Refuse unsupported content",
-          copy: "Say the PDFs do not contain enough information when retrieval cannot support an answer."
-        }
-      ]}
-    />
+    <div className="page">
+      <PageHeader
+        eyebrow="Tutor chat"
+        title="Retrieval-grounded Spanish tutor"
+        description="Ask SpanishAIAgent for help only from your uploaded PDF chunks. The tutor retrieves sources first, refuses unsupported requests, and cites the PDF file name and page number."
+        badges={[
+          { label: "PDF-only answers", tone: "rose" },
+          { label: "Server-side OpenAI", tone: "teal" }
+        ]}
+      />
+      <ChatInterface
+        initialModel={getOpenAIModel()}
+        initialOpenAIConfigured={hasOpenAIKey}
+        initialSourceChunkCount={stats.sourceChunkCount}
+        initialSourceDocumentCount={stats.sourceDocumentCount}
+      />
+    </div>
   );
 }

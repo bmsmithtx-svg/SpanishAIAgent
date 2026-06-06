@@ -1,8 +1,10 @@
 import type { SpanishAgentResponse } from "@/types";
+import { getOpenAIModel } from "@/lib/agent/openai-client";
 import { getSourceLibraryStats } from "@/lib/sources/source-service";
 
 export type SpanishAgentStatus = {
   appName: string;
+  model: string;
   openAIConfigured: boolean;
   databaseConnected: boolean;
   sourceGroundingConfigured: boolean;
@@ -10,6 +12,8 @@ export type SpanishAgentStatus = {
   sourcePageCount: number;
   sourceChunkCount: number;
   sourceIngestionReady: boolean;
+  retrievalReady: boolean;
+  chatReady: boolean;
   agentReady: boolean;
   message: string;
 };
@@ -17,19 +21,25 @@ export type SpanishAgentStatus = {
 export async function getAgentStatus(): Promise<SpanishAgentStatus> {
   const openAIConfigured = Boolean(process.env.OPENAI_API_KEY?.trim());
   const stats = await getSourceLibraryStats();
+  const retrievalReady = stats.sourceChunkCount > 0;
+  const chatReady = openAIConfigured && retrievalReady;
 
   return {
     appName: process.env.NEXT_PUBLIC_APP_NAME ?? "SpanishAIAgent",
+    model: getOpenAIModel(),
     openAIConfigured,
     databaseConnected: stats.databaseConnected,
-    sourceGroundingConfigured: stats.sourceIngestionReady,
+    sourceGroundingConfigured: retrievalReady,
     sourceDocumentCount: stats.sourceDocumentCount,
     sourcePageCount: stats.sourcePageCount,
     sourceChunkCount: stats.sourceChunkCount,
     sourceIngestionReady: stats.sourceIngestionReady,
-    agentReady: false,
-    message:
-      "Agent is not active yet. The next step is retrieval-grounded AI chat over SpanishSourceChunk records with required file/page citations."
+    retrievalReady,
+    chatReady,
+    agentReady: chatReady,
+    message: chatReady
+      ? "Retrieval-grounded chat is ready. Tutor answers must use retrieved SpanishSourceChunk records and cite file/page references."
+      : "Chat is not ready yet. Configure OPENAI_API_KEY and import PDF chunks before tutor answers are enabled."
   };
 }
 
