@@ -62,7 +62,7 @@ No Spanish curriculum should be generated from general model knowledge. Imported
 
 | Variable | Purpose |
 | --- | --- |
-| `OPENAI_API_KEY` | Server-side OpenAI API key used by `/api/agent/chat`. It is never exposed to the browser. |
+| `OPENAI_API_KEY` | Server-side OpenAI API key used by `/api/agent/chat` and embedding backfill. It is never exposed to the browser. The key must have permission to use the configured chat and embedding models. |
 | `OPENAI_MODEL` | Optional chat model. Defaults to `gpt-4.1-mini` when missing. |
 | `OPENAI_EMBEDDING_MODEL` | Optional embedding model for local semantic scoring. Defaults to `text-embedding-3-small`. |
 | `OPENAI_EMBEDDING_DIMENSIONS` | Optional embedding vector size. Defaults to `1536`. |
@@ -105,6 +105,8 @@ This is local semantic scoring over stored chunk embeddings, not full vector dat
 
 Use `/settings` to check embedding coverage and backfill chunks in small batches. Backfilling calls the OpenAI embeddings API and uses API credits. Full-library embedding should only be run intentionally in batches; there is no one-click full-library embed button.
 
+To enable embeddings, add an `OPENAI_API_KEY` to `.env.local` that has permission to use `text-embedding-3-small` or the model configured by `OPENAI_EMBEDDING_MODEL`. Run a dry run first, then intentionally embed only `10` chunks at a time.
+
 Safety controls:
 
 - Default backfill requests embed only `10` chunks.
@@ -121,10 +123,11 @@ Available endpoints:
 
 The chat API reports one of these retrieval modes:
 
-- `hybrid`: keyword candidates and local semantic scoring candidates were both available.
-- `semantic`: local semantic scoring candidates were available without keyword candidates.
+- `hybrid`: local semantic scoring was used alongside the keyword retrieval path.
 - `keyword`: local semantic scoring was unavailable, incomplete, or not useful for the query.
 - `none`: no usable source chunks were retrieved.
+
+Chat responses also include `semanticRetrievalUsed` so the UI can show whether stored embeddings affected the latest answer.
 
 ## Citations
 

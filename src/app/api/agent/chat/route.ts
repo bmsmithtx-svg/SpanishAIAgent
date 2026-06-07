@@ -47,6 +47,7 @@ export async function POST(request: Request) {
         model,
         mode,
         retrievalMode: "none",
+        semanticRetrievalUsed: false,
         sourceGrounded: false
       },
       { status: 400 }
@@ -62,6 +63,7 @@ export async function POST(request: Request) {
         model,
         mode,
         retrievalMode: "none",
+        semanticRetrievalUsed: false,
         sourceGrounded: false
       },
       { status: 400 }
@@ -76,6 +78,7 @@ export async function POST(request: Request) {
       model,
       mode,
       retrievalMode: "none",
+      semanticRetrievalUsed: false,
       sourceGrounded: false
     });
   }
@@ -90,6 +93,7 @@ export async function POST(request: Request) {
       model,
       mode,
       retrievalMode: "none",
+      semanticRetrievalUsed: false,
       sourceGrounded: false
     });
   }
@@ -107,6 +111,9 @@ export async function POST(request: Request) {
       model,
       mode,
       retrievalMode: retrieval.retrievalMode,
+      semanticRetrievalUsed: isSemanticRetrievalUsed(retrieval.retrievalMode),
+      semanticCandidateCount: retrieval.semanticCandidateCount,
+      keywordCandidateCount: retrieval.keywordCandidateCount,
       sourceGrounded: false
     });
   }
@@ -121,6 +128,9 @@ export async function POST(request: Request) {
         model,
         mode,
         retrievalMode: retrieval.retrievalMode,
+        semanticRetrievalUsed: isSemanticRetrievalUsed(retrieval.retrievalMode),
+        semanticCandidateCount: retrieval.semanticCandidateCount,
+        keywordCandidateCount: retrieval.keywordCandidateCount,
         sourceGrounded: false
       },
       { status: 503 }
@@ -149,6 +159,9 @@ export async function POST(request: Request) {
       model,
       mode,
       retrievalMode: retrieval.retrievalMode,
+      semanticRetrievalUsed: isSemanticRetrievalUsed(retrieval.retrievalMode),
+      semanticCandidateCount: retrieval.semanticCandidateCount,
+      keywordCandidateCount: retrieval.keywordCandidateCount,
       sourceGrounded: true
     });
   } catch (error) {
@@ -160,6 +173,9 @@ export async function POST(request: Request) {
         model,
         mode,
         retrievalMode: retrieval.retrievalMode,
+        semanticRetrievalUsed: isSemanticRetrievalUsed(retrieval.retrievalMode),
+        semanticCandidateCount: retrieval.semanticCandidateCount,
+        keywordCandidateCount: retrieval.keywordCandidateCount,
         sourceGrounded: false,
         error: error instanceof Error ? error.message : "Unknown OpenAI request error."
       },
@@ -172,6 +188,10 @@ function normalizeMode(mode: unknown): ChatMode {
   return typeof mode === "string" && SUPPORTED_MODES.includes(mode as ChatMode)
     ? (mode as ChatMode)
     : "ask";
+}
+
+function isSemanticRetrievalUsed(retrievalMode: string) {
+  return retrievalMode === "hybrid";
 }
 
 function normalizeMaxSources(maxSources: unknown) {

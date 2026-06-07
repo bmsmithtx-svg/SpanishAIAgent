@@ -3,7 +3,7 @@
 import { FormEvent, useMemo, useState } from "react";
 
 type ChatMode = "ask" | "lesson" | "practice" | "conversation";
-type RetrievalMode = "hybrid" | "semantic" | "keyword" | "none";
+type RetrievalMode = "hybrid" | "keyword" | "none";
 
 type ChatCitation = {
   fileName: string;
@@ -37,6 +37,7 @@ type ChatResponse = {
   model: string;
   mode: ChatMode;
   retrievalMode: RetrievalMode;
+  semanticRetrievalUsed: boolean;
   sourceGrounded: boolean;
   error?: string;
 };
@@ -49,6 +50,7 @@ type ChatMessage = {
   citations?: ChatCitation[];
   retrievedSources?: RetrievedSourcePreview[];
   retrievalMode?: RetrievalMode;
+  semanticRetrievalUsed?: boolean;
   sourceGrounded?: boolean;
   model?: string;
 };
@@ -132,6 +134,7 @@ export function ChatInterface({
         citations: payload.citations,
         retrievedSources: payload.retrievedSources,
         retrievalMode: payload.retrievalMode,
+        semanticRetrievalUsed: payload.semanticRetrievalUsed,
         sourceGrounded: payload.sourceGrounded,
         model: payload.model
       };
@@ -291,6 +294,12 @@ export function ChatInterface({
             </span>
           </div>
 
+          {latestAnswer ? (
+            <span className={`badge ${latestAnswer.semanticRetrievalUsed ? "green" : "gold"}`}>
+              Semantic used: {latestAnswer.semanticRetrievalUsed ? "yes" : "no"}
+            </span>
+          ) : null}
+
           {!latestAnswer?.retrievedSources?.length ? (
             <div className="empty-state">
               <strong>No retrieved excerpts yet</strong>
@@ -320,18 +329,17 @@ export function ChatInterface({
 function retrievalLabel(mode: RetrievalMode) {
   return {
     hybrid: "Hybrid keyword + local scoring",
-    semantic: "Local semantic scoring",
     keyword: "Keyword retrieval",
     none: "No retrieval"
   }[mode];
 }
 
 function retrievalTone(mode: RetrievalMode) {
-  return mode === "hybrid" || mode === "semantic" ? "green" : mode === "keyword" ? "gold" : "";
+  return mode === "hybrid" ? "green" : mode === "keyword" ? "gold" : "";
 }
 
 function scoreLabel(source: RetrievedSourcePreview, mode?: RetrievalMode) {
-  if (mode === "hybrid" || mode === "semantic") {
+  if (mode === "hybrid") {
     return `local score ${source.semanticScore.toFixed(3)}`;
   }
 

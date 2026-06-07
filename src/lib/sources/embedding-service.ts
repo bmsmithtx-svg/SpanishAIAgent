@@ -22,6 +22,8 @@ export type EmbeddingStatus = {
   embeddingModel: string;
   embeddingDimensions: number;
   semanticRetrievalReady: boolean;
+  defaultBackfillLimit: number;
+  maxBackfillLimit: number;
 };
 
 export type EmbeddingBackfillOptions = {
@@ -45,7 +47,9 @@ export type EmbeddingBackfillResult = EmbeddingStatus & {
   explicitLimit: boolean;
   effectiveLimit: number;
   maxLimit: number;
+  warning: string;
   warningMessage: string;
+  alreadyEmbedded: number;
   alreadyEmbeddedCount: number;
   attemptedCount: number;
   wouldEmbedCount: number;
@@ -89,7 +93,9 @@ export async function getEmbeddingStatus(): Promise<EmbeddingStatus> {
     failedEmbeddings,
     embeddingModel,
     embeddingDimensions,
-    semanticRetrievalReady: embeddedChunks > 0
+    semanticRetrievalReady: embeddedChunks > 0,
+    defaultBackfillLimit: getEmbeddingBackfillDefaultLimit(),
+    maxBackfillLimit: getEmbeddingBackfillMaxLimit()
   };
 }
 
@@ -129,7 +135,9 @@ export async function backfillChunkEmbeddings(
       explicitLimit,
       effectiveLimit: limit,
       maxLimit: getEmbeddingBackfillMaxLimit(),
+      warning: EMBEDDING_BACKFILL_WARNING,
       warningMessage: EMBEDDING_BACKFILL_WARNING,
+      alreadyEmbedded: statusBefore.embeddedChunks,
       alreadyEmbeddedCount: statusBefore.embeddedChunks,
       attemptedCount: 0,
       wouldEmbedCount: chunks.length,
@@ -199,7 +207,9 @@ export async function backfillChunkEmbeddings(
     explicitLimit,
     effectiveLimit: limit,
     maxLimit: getEmbeddingBackfillMaxLimit(),
+    warning: EMBEDDING_BACKFILL_WARNING,
     warningMessage: EMBEDDING_BACKFILL_WARNING,
+    alreadyEmbedded: statusBefore.embeddedChunks,
     alreadyEmbeddedCount: statusBefore.embeddedChunks,
     attemptedCount: chunks.length,
     wouldEmbedCount: chunks.length,

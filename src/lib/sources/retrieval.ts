@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { buildSourceSnippet, formatCitation, type RetrievedSpanishSource } from "./citations";
 import { getEmbeddingStatus } from "./embedding-service";
 
-export type RetrievalMode = "hybrid" | "semantic" | "keyword" | "none";
+export type RetrievalMode = "hybrid" | "keyword" | "none";
 
 export type RetrieveSpanishSourcesOptions = {
   maxSources?: number;
@@ -96,7 +96,7 @@ export async function retrieveSpanishSources(
   ]);
   const merged = mergeRankedSources(keywordRanked, semanticRanked);
   const sources = dedupeByPage(merged, maxSources, maxChunksPerPage);
-  const retrievalMode = getRetrievalMode(sources, keywordRanked.length, semanticRanked.length);
+  const retrievalMode = getRetrievalMode(sources, semanticRanked.length);
 
   return {
     sources,
@@ -169,6 +169,8 @@ async function retrieveSemanticCandidates(
         embeddingJson: {
           not: null
         },
+        embeddingModel: embeddingStatus.embeddingModel,
+        embeddingDimensions: embeddingStatus.embeddingDimensions,
         text: {
           not: ""
         }
@@ -181,15 +183,16 @@ async function retrieveSemanticCandidates(
 
     return candidates
       .map((chunk) => {
-        const embedding = parseEmbeddingJson(chunk.embeddingJson);
+        const embedding = parseEmbeddingJson(chunk.embeddingJson, embeddingStatus.embeddingDimensions);
         const semanticScore = embedding ? cosineSimilarity(queryEmbedding, embedding) : 0;
         const keywordRank = rankKeywordChunk(chunk, normalizedQuery, terms);
+        const combinedScore = calculateCombinedScore(semanticScore, keywordRank.keywordScore);
 
         return {
           ...keywordRank,
           semanticScore,
-          relevanceScore: semanticScore * 100 + keywordRank.keywordScore,
-          combinedScore: semanticScore * 100 + keywordRank.keywordScore
+          relevanceScore: combinedScore,
+          combinedScore
         };
       })
       .filter((source) => source.semanticScore > 0)
@@ -221,6 +224,7 @@ function rankKeywordChunk(
     filenameMatches * 10 +
     earlyPageBoost -
     Math.min(chunk.chunkIndex, 8) * 0.5;
+  const combinedScore = calculateCombinedScore(0, keywordScore);
   const citation = {
     sourceFileName: chunk.document.originalFileName,
     pageNumber: chunk.pageNumber,
@@ -240,10 +244,10 @@ function rankKeywordChunk(
     citation,
     citationLabel: formatCitation(citation),
     preview: citation.snippet ?? "",
-    relevanceScore: keywordScore,
+    relevanceScore: combinedScore,
     semanticScore: 0,
     keywordScore,
-    combinedScore: keywordScore,
+    combinedScore,
     matchedTerms: uniqueMatchedTerms
   };
 }
@@ -266,10 +270,14 @@ function mergeRankedSources(
       ...existing,
       semanticScore: Math.max(existing.semanticScore, source.semanticScore),
       keywordScore: Math.max(existing.keywordScore, source.keywordScore),
-      relevanceScore: Math.max(existing.relevanceScore, source.relevanceScore),
-      combinedScore:
-        Math.max(existing.semanticScore, source.semanticScore) * 100 +
-        Math.max(existing.keywordScore, source.keywordScore),
+      relevanceScore: calculateCombinedScore(
+        Math.max(existing.semanticScore, source.semanticScore),
+        Math.max(existing.keywordScore, source.keywordScore)
+      ),
+      combinedScore: calculateCombinedScore(
+        Math.max(existing.semanticScore, source.semanticScore),
+        Math.max(existing.keywordScore, source.keywordScore)
+      ),
       matchedTerms: Array.from(new Set([...existing.matchedTerms, ...source.matchedTerms]))
     });
   }
@@ -295,22 +303,25 @@ function mergeRankedSources(
 
 function getRetrievalMode(
   sources: RankedSpanishSource[],
-  keywordCandidateCount: number,
   semanticCandidateCount: number
 ): RetrievalMode {
   if (sources.length === 0) {
     return "none";
   }
 
-  if (semanticCandidateCount > 0 && keywordCandidateCount > 0) {
+  if (semanticCandidateCount > 0) {
     return "hybrid";
   }
 
-  if (semanticCandidateCount > 0) {
-    return "semantic";
-  }
-
   return "keyword";
+}
+
+function calculateCombinedScore(semanticScore: number, keywordScore: number) {
+  return semanticScore * 0.7 + normalizeKeywordScore(keywordScore) * 0.3;
+}
+
+function normalizeKeywordScore(keywordScore: number) {
+  return Math.min(Math.max(keywordScore / 100, 0), 1);
 }
 
 function tokenizeQuery(query: string) {

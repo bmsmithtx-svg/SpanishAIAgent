@@ -24,6 +24,7 @@ export async function embedText(text: string) {
 
 export async function embedTexts(texts: string[]) {
   const cleanedTexts = texts.map((text) => text.replace(/\s+/g, " ").trim());
+  const embeddingDimensions = getEmbeddingDimensions();
 
   if (cleanedTexts.some((text) => text.length === 0)) {
     throw new Error("Cannot embed empty text.");
@@ -34,10 +35,19 @@ export async function embedTexts(texts: string[]) {
     model: getEmbeddingModel(),
     input: cleanedTexts,
     encoding_format: "float",
-    dimensions: getEmbeddingDimensions()
+    dimensions: embeddingDimensions
   });
+  const embeddings = response.data.map((item) => item.embedding);
 
-  return response.data.map((item) => item.embedding);
+  if (embeddings.length !== cleanedTexts.length) {
+    throw new Error("Embedding response did not include one vector per input.");
+  }
+
+  if (embeddings.some((embedding) => embedding.length !== embeddingDimensions)) {
+    throw new Error(`Embedding response dimensions did not match ${embeddingDimensions}.`);
+  }
+
+  return embeddings;
 }
 
 export function cosineSimilarity(a: number[], b: number[]) {
@@ -66,7 +76,7 @@ export function serializeEmbedding(embedding: number[]) {
   return JSON.stringify(embedding);
 }
 
-export function parseEmbeddingJson(embeddingJson?: string | null) {
+export function parseEmbeddingJson(embeddingJson?: string | null, expectedDimensions?: number) {
   if (!embeddingJson) {
     return null;
   }
@@ -75,6 +85,10 @@ export function parseEmbeddingJson(embeddingJson?: string | null) {
     const parsed = JSON.parse(embeddingJson) as unknown;
 
     if (!Array.isArray(parsed) || parsed.some((value) => typeof value !== "number")) {
+      return null;
+    }
+
+    if (expectedDimensions && parsed.length !== expectedDimensions) {
       return null;
     }
 

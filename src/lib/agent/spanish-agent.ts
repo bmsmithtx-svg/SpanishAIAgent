@@ -15,9 +15,16 @@ export type SpanishAgentStatus = {
   sourceIngestionReady: boolean;
   embeddingModel: string;
   embeddingDimensions: number;
+  totalChunks: number;
+  embeddedChunks: number;
   embeddedChunkCount: number;
+  missingEmbeddings: number;
   missingEmbeddingCount: number;
+  failedEmbeddings: number;
+  defaultBackfillLimit: number;
+  maxBackfillLimit: number;
   semanticRetrievalReady: boolean;
+  retrievalModeAvailability: "hybrid" | "keyword" | "none";
   retrievalReady: boolean;
   chatReady: boolean;
   agentReady: boolean;
@@ -32,6 +39,11 @@ export async function getAgentStatus(): Promise<SpanishAgentStatus> {
   ]);
   const retrievalReady = stats.sourceChunkCount > 0;
   const chatReady = openAIConfigured && retrievalReady;
+  const retrievalModeAvailability = embeddingStatus.semanticRetrievalReady
+    ? "hybrid"
+    : retrievalReady
+      ? "keyword"
+      : "none";
 
   return {
     appName: process.env.NEXT_PUBLIC_APP_NAME ?? "SpanishAIAgent",
@@ -45,9 +57,16 @@ export async function getAgentStatus(): Promise<SpanishAgentStatus> {
     sourceIngestionReady: stats.sourceIngestionReady,
     embeddingModel: embeddingStatus.embeddingModel,
     embeddingDimensions: embeddingStatus.embeddingDimensions,
+    totalChunks: embeddingStatus.totalChunks,
+    embeddedChunks: embeddingStatus.embeddedChunks,
     embeddedChunkCount: embeddingStatus.embeddedChunks,
+    missingEmbeddings: embeddingStatus.missingEmbeddings,
     missingEmbeddingCount: embeddingStatus.missingEmbeddings,
+    failedEmbeddings: embeddingStatus.failedEmbeddings,
+    defaultBackfillLimit: embeddingStatus.defaultBackfillLimit,
+    maxBackfillLimit: embeddingStatus.maxBackfillLimit,
     semanticRetrievalReady: embeddingStatus.semanticRetrievalReady,
+    retrievalModeAvailability,
     retrievalReady,
     chatReady,
     agentReady: chatReady,
