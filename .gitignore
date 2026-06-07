@@ -37,6 +37,15 @@ local-sources/**/*.sqlite3
 # Local Spanish source files and extraction output
 *.pdf
 local-sources/**/*.pdf
+local-sources/pdfs
+local-sources/pdfs/
+!local-sources/pdfs/.gitkeep
+local-sources/uploads
+local-sources/uploads/
+!local-sources/uploads/.gitkeep
+local-sources/extracted
+local-sources/extracted/
+!local-sources/extracted/.gitkeep
 local-sources/uploads/*
 local-sources/extracted/*
 local-sources/**/*.tmp
