@@ -700,6 +700,19 @@ p {
   width: fit-content;
 }
 
+.action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.sample-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
 .page-record {
   scroll-margin-top: 24px;
 }

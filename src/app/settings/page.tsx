@@ -1,7 +1,12 @@
 import { EmbeddingBackfillPanel } from "@/components/embedding-backfill-panel";
 import { PageHeader } from "@/components/page-header";
 import { getOpenAIModel } from "@/lib/agent/openai-client";
-import { getEmbeddingStatus, getSourceLibraryStats } from "@/lib/sources";
+import {
+  getEmbeddingBackfillDefaultLimit,
+  getEmbeddingBackfillMaxLimit,
+  getEmbeddingStatus,
+  getSourceLibraryStats
+} from "@/lib/sources";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +19,8 @@ export default async function SettingsPage() {
   const retrievalReady = stats.sourceChunkCount > 0;
   const chatReady = hasOpenAIKey && retrievalReady;
   const model = getOpenAIModel();
+  const backfillDefaultLimit = getEmbeddingBackfillDefaultLimit();
+  const backfillMaxLimit = getEmbeddingBackfillMaxLimit();
 
   return (
     <div className="page">
@@ -24,7 +31,7 @@ export default async function SettingsPage() {
         badges={[
           { label: hasOpenAIKey ? "OpenAI key detected" : "OpenAI key missing", tone: hasOpenAIKey ? "green" : "rose" },
           { label: stats.databaseConnected ? "Database connected" : "Database missing", tone: stats.databaseConnected ? "green" : "rose" },
-          { label: embeddingStatus.semanticRetrievalReady ? "Semantic ready" : "Keyword fallback", tone: embeddingStatus.semanticRetrievalReady ? "green" : "gold" },
+          { label: embeddingStatus.semanticRetrievalReady ? "Local scoring ready" : "Keyword fallback", tone: embeddingStatus.semanticRetrievalReady ? "green" : "gold" },
           { label: chatReady ? "Chat ready" : "Chat not ready", tone: chatReady ? "green" : "gold" }
         ]}
       />
@@ -73,7 +80,7 @@ export default async function SettingsPage() {
               <strong>Retrieval</strong>
               <span>
                 {embeddingStatus.semanticRetrievalReady
-                  ? "Hybrid semantic + keyword retrieval ready"
+                  ? "Hybrid keyword + local semantic scoring ready"
                   : retrievalReady
                     ? "Keyword fallback ready"
                     : "Not ready"}
@@ -88,13 +95,18 @@ export default async function SettingsPage() {
       </section>
 
       <section className="detail-grid section-offset">
-        <EmbeddingBackfillPanel initialStatus={embeddingStatus} />
+        <EmbeddingBackfillPanel
+          defaultLimit={backfillDefaultLimit}
+          initialStatus={embeddingStatus}
+          maxLimit={backfillMaxLimit}
+        />
         <aside className="placeholder-panel">
           <span className="badge gold">API credits</span>
           <h2>Backfill in batches</h2>
           <p>
             Use the batch button until missing embeddings reach zero. The chat route
             keeps working with keyword retrieval while embeddings are incomplete.
+            Full-library embedding should only be run intentionally in batches.
           </p>
           <div className="stack">
             <span className="code-pill">GET /api/sources/embeddings/status</span>

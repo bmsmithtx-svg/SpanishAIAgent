@@ -7,6 +7,7 @@ export const runtime = "nodejs";
 type BackfillRequest = {
   limit?: unknown;
   batchSize?: unknown;
+  dryRun?: unknown;
 };
 
 export async function POST(request: Request) {
@@ -15,7 +16,8 @@ export async function POST(request: Request) {
   try {
     const result = await backfillChunkEmbeddings({
       limit: normalizeNumber(body.limit),
-      batchSize: normalizeNumber(body.batchSize)
+      batchSize: normalizeNumber(body.batchSize),
+      dryRun: body.dryRun === true
     });
 
     return NextResponse.json(result);

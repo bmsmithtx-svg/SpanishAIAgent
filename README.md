@@ -29,6 +29,8 @@ No Spanish curriculum should be generated from general model knowledge. Imported
    OPENAI_MODEL=gpt-4.1-mini
    OPENAI_EMBEDDING_MODEL=text-embedding-3-small
    OPENAI_EMBEDDING_DIMENSIONS=1536
+   EMBEDDING_BACKFILL_DEFAULT_LIMIT=10
+   EMBEDDING_BACKFILL_MAX_LIMIT=100
    DATABASE_URL="file:../local-sources/spanish-ai-agent.db"
    ```
 
@@ -62,8 +64,10 @@ No Spanish curriculum should be generated from general model knowledge. Imported
 | --- | --- |
 | `OPENAI_API_KEY` | Server-side OpenAI API key used by `/api/agent/chat`. It is never exposed to the browser. |
 | `OPENAI_MODEL` | Optional chat model. Defaults to `gpt-4.1-mini` when missing. |
-| `OPENAI_EMBEDDING_MODEL` | Optional embedding model for semantic retrieval. Defaults to `text-embedding-3-small`. |
+| `OPENAI_EMBEDDING_MODEL` | Optional embedding model for local semantic scoring. Defaults to `text-embedding-3-small`. |
 | `OPENAI_EMBEDDING_DIMENSIONS` | Optional embedding vector size. Defaults to `1536`. |
+| `EMBEDDING_BACKFILL_DEFAULT_LIMIT` | Optional safe default batch size for embedding backfill. Defaults to `10`. |
+| `EMBEDDING_BACKFILL_MAX_LIMIT` | Optional server-side max batch size. Values above `100` are capped to `100`. |
 | `DATABASE_URL` | Local SQLite database URL for imported PDF metadata, pages, and chunks. |
 | `NEXT_PUBLIC_APP_NAME` | Public app name shown in API status responses. Defaults to `SpanishAIAgent`. |
 
@@ -83,9 +87,9 @@ Duplicate PDFs are detected with a SHA-256 file hash. Uploading the same PDF twi
 The `/chat` page and `/api/agent/chat` route implement the first working SpanishAIAgent tutor flow:
 
 1. The user sends a question or study request.
-2. The server searches `SpanishSourceChunk` records with hybrid retrieval when embeddings exist, or keyword retrieval when they do not.
+2. The server searches `SpanishSourceChunk` records with hybrid retrieval when stored embeddings exist, or keyword retrieval when they do not.
 3. Keyword matches are ranked by exact phrase match, keyword overlap, and source relevance.
-4. Semantic matches compare the question embedding to stored chunk embeddings.
+4. Local semantic scoring compares the question embedding to stored chunk embeddings. This is not full vector database search.
 5. If no chunks are found, the app does not call OpenAI and returns a PDF-only refusal.
 6. If chunks are found, the server sends only those excerpts to OpenAI.
 7. The model is instructed to answer only from the retrieved PDF excerpts.
@@ -93,22 +97,33 @@ The `/chat` page and `/api/agent/chat` route implement the first working Spanish
 
 The tutor must refuse requests that ask it to ignore PDFs, use outside knowledge, skip citations, or invent unsupported Spanish content.
 
-## Semantic Retrieval
+## Local Semantic Scoring
 
-Embeddings are stored on `SpanishSourceChunk` rows in the local SQLite database. This keeps the first version local-first and simple while preserving the future option to move vectors into a dedicated vector store.
+Embeddings are stored as JSON on `SpanishSourceChunk` rows in the local SQLite database. This is acceptable for local-first MVP development and a small PDF library because it keeps setup simple and portable.
 
-Use `/settings` to check embedding coverage and backfill chunks in small batches. Backfilling calls the OpenAI embeddings API and uses API credits.
+This is local semantic scoring over stored chunk embeddings, not full vector database search. It may become slow with a large library because the app scans stored SQLite embeddings in application code. A real vector database or vector extension can be considered later if the source library grows.
+
+Use `/settings` to check embedding coverage and backfill chunks in small batches. Backfilling calls the OpenAI embeddings API and uses API credits. Full-library embedding should only be run intentionally in batches; there is no one-click full-library embed button.
+
+Safety controls:
+
+- Default backfill requests embed only `10` chunks.
+- The server hard-caps each request at `100` chunks, even if a larger limit is passed.
+- Embedding all remaining chunks requires an explicit `limit`; no-limit requests cannot silently finish the whole library.
+- Dry runs count the next batch and return sample chunk/page references without calling OpenAI or writing to the database.
+- The endpoint returns `remainingCount` so more batches can be run intentionally.
 
 Available endpoints:
 
 - `GET /api/sources/embeddings/status`
-- `POST /api/sources/embeddings/backfill`
+- `POST /api/sources/embeddings/backfill` with `{ "limit": 10, "dryRun": true }`
+- `POST /api/sources/embeddings/backfill` with `{ "limit": 10 }` only after approving a real API-credit-using batch
 
 The chat API reports one of these retrieval modes:
 
-- `hybrid`: keyword and semantic candidates were both available.
-- `semantic`: semantic candidates were available without keyword candidates.
-- `keyword`: semantic retrieval was unavailable, incomplete, or not useful for the query.
+- `hybrid`: keyword candidates and local semantic scoring candidates were both available.
+- `semantic`: local semantic scoring candidates were available without keyword candidates.
+- `keyword`: local semantic scoring was unavailable, incomplete, or not useful for the query.
 - `none`: no usable source chunks were retrieved.
 
 ## Citations
@@ -153,8 +168,8 @@ Only `.gitkeep` placeholders are tracked inside `local-sources/` so the folder s
 | `/api/sources/[id]` | Load one source document. |
 | `/api/sources/[id]/pages` | Load extracted pages for one source document. |
 | `/api/sources/search` | Keyword search across extracted source chunks. |
-| `/api/sources/embeddings/status` | Returns local embedding coverage and semantic retrieval readiness. |
-| `/api/sources/embeddings/backfill` | Embeds the next batch of missing source chunks without exposing secrets. |
+| `/api/sources/embeddings/status` | Returns local embedding coverage and local semantic scoring readiness. |
+| `/api/sources/embeddings/backfill` | Dry-runs or embeds a capped batch of missing source chunks without exposing secrets. |
 | `/api/agent/status` | Returns safe agent/source/chat status without exposing secrets. |
 | `/api/agent/chat` | Server-side retrieval-grounded tutor chat endpoint. |
 
@@ -164,7 +179,7 @@ Prisma uses SQLite for local development and defines:
 
 - `SpanishSourceDocument`: source PDF metadata, local path, SHA-256 hash, page count, processing status, extraction method, and processing errors.
 - `SpanishSourcePage`: one row per PDF page with page number, extracted text, extraction method, and character count.
-- `SpanishSourceChunk`: page-level text chunks for retrieval, with document/page references, chunk indexes, optional embedding JSON, embedding model metadata, and embedding error state.
+- `SpanishSourceChunk`: page-level text chunks for retrieval, with document/page references, chunk indexes, optional embedding JSON stored in SQLite, embedding model metadata, and embedding error state.
 
 Useful indexes are included for file hashes, document/page lookups, page numbers, chunk relationships, and embedding backfill status.
 
@@ -176,14 +191,14 @@ Useful indexes are included for file hashes, document/page lookups, page numbers
 
 ## Source-Grounded Architecture
 
-- `src/lib/sources` contains PDF storage, extraction, chunking, keyword retrieval, semantic retrieval, embedding backfill, search, citation utilities, and source database helpers.
+- `src/lib/sources` contains PDF storage, extraction, chunking, keyword retrieval, local semantic scoring over stored chunk embeddings, embedding backfill, search, citation utilities, and source database helpers.
 - `src/lib/agent` contains OpenAI client setup, embedding helpers, and agent readiness helpers.
 - `src/lib/prompts` contains the PDF-only guardrail prompt draft.
 - `src/types` contains shared source, lesson, practice, citation, and agent response types.
 
 ## Current Limitations
 
-- Semantic retrieval currently scans stored SQLite embeddings in application code. A dedicated vector index may be useful after the source library grows.
+- Local semantic scoring currently scans JSON embeddings stored in SQLite. This is fine for a small PDF library, but a dedicated vector index may be useful after the source library grows.
 - Embeddings are backfilled manually from `/settings`; automatic embedding on upload is not implemented yet.
 - The tutor has no long-term chat memory.
 - Daily lesson generation is not yet organized by PDF sections.
@@ -205,3 +220,14 @@ npm run lint
 npm run typecheck
 npm run build
 ```
+
+## API Smoke Tests
+
+API smoke tests are sufficient if browser automation cannot reach localhost.
+
+Recommended checks:
+
+- `GET /api/agent/status`
+- `GET /api/sources/embeddings/status`
+- `POST /api/sources/embeddings/backfill` with `{ "limit": 10, "dryRun": true }`
+- `POST /api/sources/embeddings/backfill` with `{ "limit": 10 }` only after approving a real API-credit-using batch

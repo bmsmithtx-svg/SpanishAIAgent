@@ -32,10 +32,13 @@ export type {
 } from "./retrieval";
 export {
   backfillChunkEmbeddings,
+  getEmbeddingBackfillDefaultLimit,
+  getEmbeddingBackfillMaxLimit,
   getEmbeddingStatus
 } from "./embedding-service";
 export type {
   EmbeddingBackfillOptions,
   EmbeddingBackfillResult,
+  EmbeddingBackfillSampleChunk,
   EmbeddingStatus
 } from "./embedding-service";

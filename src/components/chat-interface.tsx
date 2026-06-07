@@ -319,8 +319,8 @@ export function ChatInterface({
 
 function retrievalLabel(mode: RetrievalMode) {
   return {
-    hybrid: "Hybrid retrieval",
-    semantic: "Semantic retrieval",
+    hybrid: "Hybrid keyword + local scoring",
+    semantic: "Local semantic scoring",
     keyword: "Keyword retrieval",
     none: "No retrieval"
   }[mode];
@@ -332,7 +332,7 @@ function retrievalTone(mode: RetrievalMode) {
 
 function scoreLabel(source: RetrievedSourcePreview, mode?: RetrievalMode) {
   if (mode === "hybrid" || mode === "semantic") {
-    return `semantic ${source.semanticScore.toFixed(3)}`;
+    return `local score ${source.semanticScore.toFixed(3)}`;
   }
 
   return `keyword ${Math.round(source.keywordScore)}`;
