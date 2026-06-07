@@ -45,21 +45,28 @@ model SpanishSourcePage {
 }
 
 model SpanishSourceChunk {
-  id             String                @id @default(cuid())
-  documentId     String
-  pageId         String
-  pageNumber     Int
-  chunkIndex     Int
-  text           String
-  characterCount Int                   @default(0)
-  createdAt      DateTime              @default(now())
-  updatedAt      DateTime              @updatedAt
-  document       SpanishSourceDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  page           SpanishSourcePage     @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  id                  String                @id @default(cuid())
+  documentId          String
+  pageId              String
+  pageNumber          Int
+  chunkIndex          Int
+  text                String
+  characterCount      Int                   @default(0)
+  embeddingJson       String?
+  embeddingModel      String?
+  embeddingDimensions Int?
+  embeddedAt          DateTime?
+  embeddingError      String?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  document            SpanishSourceDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  page                SpanishSourcePage     @relation(fields: [pageId], references: [id], onDelete: Cascade)
 
   @@unique([pageId, chunkIndex])
   @@index([documentId])
   @@index([pageId])
   @@index([pageNumber])
   @@index([documentId, pageNumber])
+  @@index([embeddingModel])
+  @@index([embeddedAt])
 }

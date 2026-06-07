@@ -1,12 +1,16 @@
+import { EmbeddingBackfillPanel } from "@/components/embedding-backfill-panel";
 import { PageHeader } from "@/components/page-header";
 import { getOpenAIModel } from "@/lib/agent/openai-client";
-import { getSourceLibraryStats } from "@/lib/sources";
+import { getEmbeddingStatus, getSourceLibraryStats } from "@/lib/sources";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
   const hasOpenAIKey = Boolean(process.env.OPENAI_API_KEY?.trim());
-  const stats = await getSourceLibraryStats();
+  const [stats, embeddingStatus] = await Promise.all([
+    getSourceLibraryStats(),
+    getEmbeddingStatus()
+  ]);
   const retrievalReady = stats.sourceChunkCount > 0;
   const chatReady = hasOpenAIKey && retrievalReady;
   const model = getOpenAIModel();
@@ -20,6 +24,7 @@ export default async function SettingsPage() {
         badges={[
           { label: hasOpenAIKey ? "OpenAI key detected" : "OpenAI key missing", tone: hasOpenAIKey ? "green" : "rose" },
           { label: stats.databaseConnected ? "Database connected" : "Database missing", tone: stats.databaseConnected ? "green" : "rose" },
+          { label: embeddingStatus.semanticRetrievalReady ? "Semantic ready" : "Keyword fallback", tone: embeddingStatus.semanticRetrievalReady ? "green" : "gold" },
           { label: chatReady ? "Chat ready" : "Chat not ready", tone: chatReady ? "green" : "gold" }
         ]}
       />
@@ -43,7 +48,7 @@ export default async function SettingsPage() {
 
         <aside className="placeholder-panel">
           <span className="badge rose">Readiness</span>
-          <div className="stack" style={{ marginTop: 14 }}>
+          <div className="stack readiness-stack">
             <div className="timeline-item">
               <strong>OpenAI API key</strong>
               <span>{hasOpenAIKey ? "Configured locally" : "Not configured locally"}</span>
@@ -66,12 +71,34 @@ export default async function SettingsPage() {
             </div>
             <div className="timeline-item">
               <strong>Retrieval</strong>
-              <span>{retrievalReady ? "Ready with indexed chunks" : "Not ready"}</span>
+              <span>
+                {embeddingStatus.semanticRetrievalReady
+                  ? "Hybrid semantic + keyword retrieval ready"
+                  : retrievalReady
+                    ? "Keyword fallback ready"
+                    : "Not ready"}
+              </span>
             </div>
             <div className="timeline-item">
               <strong>Chat</strong>
               <span>{chatReady ? "Ready for PDF-grounded tutor answers" : "Needs OpenAI key and chunks"}</span>
             </div>
+          </div>
+        </aside>
+      </section>
+
+      <section className="detail-grid section-offset">
+        <EmbeddingBackfillPanel initialStatus={embeddingStatus} />
+        <aside className="placeholder-panel">
+          <span className="badge gold">API credits</span>
+          <h2>Backfill in batches</h2>
+          <p>
+            Use the batch button until missing embeddings reach zero. The chat route
+            keeps working with keyword retrieval while embeddings are incomplete.
+          </p>
+          <div className="stack">
+            <span className="code-pill">GET /api/sources/embeddings/status</span>
+            <span className="code-pill">POST /api/sources/embeddings/backfill</span>
           </div>
         </aside>
       </section>

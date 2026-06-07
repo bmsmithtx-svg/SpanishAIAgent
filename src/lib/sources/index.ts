@@ -25,4 +25,17 @@ export type {
   SourceCitation
 } from "./citations";
 export { retrieveSpanishSources } from "./retrieval";
-export type { RankedSpanishSource, RetrieveSpanishSourcesOptions } from "./retrieval";
+export type {
+  RankedSpanishSource,
+  RetrievalMode,
+  RetrieveSpanishSourcesOptions
+} from "./retrieval";
+export {
+  backfillChunkEmbeddings,
+  getEmbeddingStatus
+} from "./embedding-service";
+export type {
+  EmbeddingBackfillOptions,
+  EmbeddingBackfillResult,
+  EmbeddingStatus
+} from "./embedding-service";

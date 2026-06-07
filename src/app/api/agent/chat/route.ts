@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { createOpenAIClient, getOpenAIModel, hasOpenAIKey } from "@/lib/agent/openai-client";
 import { spanishAgentSystemPrompt } from "@/lib/prompts/spanish-agent-system-prompt";
-import { getSourceLibraryStats, retrieveSpanishSources, type RankedSpanishSource } from "@/lib/sources";
+import {
+  getSourceLibraryStats,
+  retrieveSpanishSources,
+  type RankedSpanishSource
+} from "@/lib/sources";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -42,6 +46,7 @@ export async function POST(request: Request) {
         retrievedSources: [],
         model,
         mode,
+        retrievalMode: "none",
         sourceGrounded: false
       },
       { status: 400 }
@@ -56,6 +61,7 @@ export async function POST(request: Request) {
         retrievedSources: [],
         model,
         mode,
+        retrievalMode: "none",
         sourceGrounded: false
       },
       { status: 400 }
@@ -69,6 +75,7 @@ export async function POST(request: Request) {
       retrievedSources: [],
       model,
       mode,
+      retrievalMode: "none",
       sourceGrounded: false
     });
   }
@@ -82,13 +89,15 @@ export async function POST(request: Request) {
       retrievedSources: [],
       model,
       mode,
+      retrievalMode: "none",
       sourceGrounded: false
     });
   }
 
-  const retrievedSources = await retrieveSpanishSources(message, {
+  const retrieval = await retrieveSpanishSources(message, {
     maxSources
   });
+  const retrievedSources = retrieval.sources;
 
   if (retrievedSources.length === 0) {
     return NextResponse.json({
@@ -97,6 +106,7 @@ export async function POST(request: Request) {
       retrievedSources: [],
       model,
       mode,
+      retrievalMode: retrieval.retrievalMode,
       sourceGrounded: false
     });
   }
@@ -110,6 +120,7 @@ export async function POST(request: Request) {
         retrievedSources: serializeSources(retrievedSources),
         model,
         mode,
+        retrievalMode: retrieval.retrievalMode,
         sourceGrounded: false
       },
       { status: 503 }
@@ -137,6 +148,7 @@ export async function POST(request: Request) {
       retrievedSources: serializeSources(retrievedSources),
       model,
       mode,
+      retrievalMode: retrieval.retrievalMode,
       sourceGrounded: true
     });
   } catch (error) {
@@ -147,6 +159,7 @@ export async function POST(request: Request) {
         retrievedSources: serializeSources(retrievedSources),
         model,
         mode,
+        retrievalMode: retrieval.retrievalMode,
         sourceGrounded: false,
         error: error instanceof Error ? error.message : "Unknown OpenAI request error."
       },
@@ -267,6 +280,9 @@ function serializeSources(sources: RankedSpanishSource[]) {
     citationLabel: source.citationLabel,
     preview: source.preview,
     relevanceScore: source.relevanceScore,
+    semanticScore: source.semanticScore,
+    keywordScore: source.keywordScore,
+    combinedScore: source.combinedScore,
     matchedTerms: source.matchedTerms
   }));
 }

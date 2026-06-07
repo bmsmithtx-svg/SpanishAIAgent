@@ -1,5 +1,6 @@
 import type { SpanishAgentResponse } from "@/types";
 import { getOpenAIModel } from "@/lib/agent/openai-client";
+import { getEmbeddingStatus } from "@/lib/sources/embedding-service";
 import { getSourceLibraryStats } from "@/lib/sources/source-service";
 
 export type SpanishAgentStatus = {
@@ -12,6 +13,11 @@ export type SpanishAgentStatus = {
   sourcePageCount: number;
   sourceChunkCount: number;
   sourceIngestionReady: boolean;
+  embeddingModel: string;
+  embeddingDimensions: number;
+  embeddedChunkCount: number;
+  missingEmbeddingCount: number;
+  semanticRetrievalReady: boolean;
   retrievalReady: boolean;
   chatReady: boolean;
   agentReady: boolean;
@@ -20,7 +26,10 @@ export type SpanishAgentStatus = {
 
 export async function getAgentStatus(): Promise<SpanishAgentStatus> {
   const openAIConfigured = Boolean(process.env.OPENAI_API_KEY?.trim());
-  const stats = await getSourceLibraryStats();
+  const [stats, embeddingStatus] = await Promise.all([
+    getSourceLibraryStats(),
+    getEmbeddingStatus()
+  ]);
   const retrievalReady = stats.sourceChunkCount > 0;
   const chatReady = openAIConfigured && retrievalReady;
 
@@ -34,6 +43,11 @@ export async function getAgentStatus(): Promise<SpanishAgentStatus> {
     sourcePageCount: stats.sourcePageCount,
     sourceChunkCount: stats.sourceChunkCount,
     sourceIngestionReady: stats.sourceIngestionReady,
+    embeddingModel: embeddingStatus.embeddingModel,
+    embeddingDimensions: embeddingStatus.embeddingDimensions,
+    embeddedChunkCount: embeddingStatus.embeddedChunks,
+    missingEmbeddingCount: embeddingStatus.missingEmbeddings,
+    semanticRetrievalReady: embeddingStatus.semanticRetrievalReady,
     retrievalReady,
     chatReady,
     agentReady: chatReady,

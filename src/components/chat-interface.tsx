@@ -3,6 +3,7 @@
 import { FormEvent, useMemo, useState } from "react";
 
 type ChatMode = "ask" | "lesson" | "practice" | "conversation";
+type RetrievalMode = "hybrid" | "semantic" | "keyword" | "none";
 
 type ChatCitation = {
   fileName: string;
@@ -23,6 +24,9 @@ type RetrievedSourcePreview = {
   citationLabel: string;
   preview: string;
   relevanceScore: number;
+  semanticScore: number;
+  keywordScore: number;
+  combinedScore: number;
   matchedTerms: string[];
 };
 
@@ -32,6 +36,7 @@ type ChatResponse = {
   retrievedSources: RetrievedSourcePreview[];
   model: string;
   mode: ChatMode;
+  retrievalMode: RetrievalMode;
   sourceGrounded: boolean;
   error?: string;
 };
@@ -43,6 +48,7 @@ type ChatMessage = {
   mode: ChatMode;
   citations?: ChatCitation[];
   retrievedSources?: RetrievedSourcePreview[];
+  retrievalMode?: RetrievalMode;
   sourceGrounded?: boolean;
   model?: string;
 };
@@ -125,6 +131,7 @@ export function ChatInterface({
         mode: payload.mode,
         citations: payload.citations,
         retrievedSources: payload.retrievedSources,
+        retrievalMode: payload.retrievalMode,
         sourceGrounded: payload.sourceGrounded,
         model: payload.model
       };
@@ -197,6 +204,11 @@ export function ChatInterface({
                 <span className="message-label">
                   {message.role === "user" ? "You" : "SpanishAIAgent"}
                 </span>
+                {message.role === "assistant" && message.retrievalMode ? (
+                  <span className={`message-mode-pill ${retrievalTone(message.retrievalMode)}`}>
+                    {retrievalLabel(message.retrievalMode)}
+                  </span>
+                ) : null}
                 <p>{message.content}</p>
               </article>
             ))}
@@ -273,7 +285,9 @@ export function ChatInterface({
               <h2>PDF context</h2>
             </div>
             <span className="result-count">
-              {latestAnswer?.sourceGrounded ? "Grounded" : "Waiting"}
+              {latestAnswer?.retrievalMode
+                ? retrievalLabel(latestAnswer.retrievalMode)
+                : "Waiting"}
             </span>
           </div>
 
@@ -286,7 +300,12 @@ export function ChatInterface({
             <div className="source-preview-list">
               {latestAnswer.retrievedSources.map((source) => (
                 <details className="source-preview" key={source.chunkId}>
-                  <summary>{source.citationLabel}</summary>
+                  <summary>
+                    <span>{source.citationLabel}</span>
+                    <span className="source-score">
+                      {scoreLabel(source, latestAnswer.retrievalMode)}
+                    </span>
+                  </summary>
                   <p>{source.preview}</p>
                 </details>
               ))}
@@ -296,4 +315,25 @@ export function ChatInterface({
       </section>
     </div>
   );
+}
+
+function retrievalLabel(mode: RetrievalMode) {
+  return {
+    hybrid: "Hybrid retrieval",
+    semantic: "Semantic retrieval",
+    keyword: "Keyword retrieval",
+    none: "No retrieval"
+  }[mode];
+}
+
+function retrievalTone(mode: RetrievalMode) {
+  return mode === "hybrid" || mode === "semantic" ? "green" : mode === "keyword" ? "gold" : "";
+}
+
+function scoreLabel(source: RetrievedSourcePreview, mode?: RetrievalMode) {
+  if (mode === "hybrid" || mode === "semantic") {
+    return `semantic ${source.semanticScore.toFixed(3)}`;
+  }
+
+  return `keyword ${Math.round(source.keywordScore)}`;
 }
