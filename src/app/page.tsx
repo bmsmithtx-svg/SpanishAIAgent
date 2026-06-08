@@ -1,23 +1,35 @@
 import { CurriculumStatusPanel } from "@/components/curriculum-status-panel";
 import { FeatureCard } from "@/components/feature-card";
 import { PageHeader } from "@/components/page-header";
-import { getCurriculumSections, getCurriculumSummary } from "@/lib/curriculum";
-import { getSourceLibraryStats } from "@/lib/sources";
+import { getCurriculumSections, getCurriculumSummary, getDailyLessonByDayNumber } from "@/lib/curriculum";
+import { getEmbeddingStatus, getSourceLibraryStats } from "@/lib/sources";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const stats = await getSourceLibraryStats();
+  const [stats, embeddingStatus] = await Promise.all([
+    getSourceLibraryStats(),
+    getEmbeddingStatus()
+  ]);
   const sections = getCurriculumSections();
   const curriculumSummary = getCurriculumSummary();
+  const currentLesson = getDailyLessonByDayNumber(1);
+  const lessonRetrievalStatus = embeddingStatus.semanticRetrievalReady
+    ? "local semantic scoring over stored chunk embeddings ready"
+    : stats.sourceChunkCount > 0
+      ? "keyword retrieval ready"
+      : "needs source chunks";
   const dashboardCards = [
     {
       index: "01",
-      title: "Today's Spanish lesson",
-      status: "Day 1 shell",
-      description:
-        "The first 20-minute lesson shell is ready, with Spanish content hidden until PDF citations can support it.",
-      tone: "teal" as const
+      title: "Current lesson",
+      status: stats.sourceIngestionReady ? "PDF sources ready" : "Needs PDFs",
+      description: currentLesson
+        ? `Day ${currentLesson.dayNumber}: ${currentLesson.grammarFocus}. Retrieval status: ${lessonRetrievalStatus}.`
+        : "Daily lesson metadata is not available yet.",
+      tone: stats.sourceIngestionReady ? ("green" as const) : ("gold" as const),
+      href: currentLesson ? `/learn/day/${currentLesson.dayNumber}` : "/learn",
+      actionLabel: "Open current lesson"
     },
     {
       index: "02",

@@ -70,10 +70,10 @@ const modes: Array<{ value: ChatMode; label: string }> = [
 ];
 
 const examplePrompts = [
-  "Teach me today's Spanish lesson from the PDFs.",
-  "Explain ser vs estar using only my PDFs.",
-  "Give me family conversation practice from the PDFs.",
-  "What should I practice speaking aloud today?"
+  "Help me with today's grammar focus using only my PDFs.",
+  "Quiz me on today's sentence-building practice from the PDFs.",
+  "Explain the source citations for today's lesson.",
+  "What should I practice speaking aloud today from the PDFs?"
 ];
 
 export function ChatInterface({

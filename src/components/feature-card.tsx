@@ -1,9 +1,13 @@
+import Link from "next/link";
+
 type FeatureCardProps = {
   index: string;
   title: string;
   status: string;
   description: string;
   tone?: "teal" | "gold" | "rose" | "green";
+  href?: string;
+  actionLabel?: string;
 };
 
 export function FeatureCard({
@@ -11,9 +15,11 @@ export function FeatureCard({
   title,
   status,
   description,
-  tone = "teal"
+  tone = "teal",
+  href,
+  actionLabel = "Open"
 }: FeatureCardProps) {
-  return (
+  const cardContent = (
     <article className="card">
       <div className="card-topline">
         <span className="card-index">{index}</span>
@@ -21,6 +27,15 @@ export function FeatureCard({
       </div>
       <h3>{title}</h3>
       <p>{description}</p>
+      {href ? <span className="card-action-label">{actionLabel}</span> : null}
     </article>
+  );
+
+  return href ? (
+    <Link className="card-link" href={href}>
+      {cardContent}
+    </Link>
+  ) : (
+    cardContent
   );
 }

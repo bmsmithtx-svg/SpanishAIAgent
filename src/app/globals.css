@@ -359,6 +359,19 @@ p {
   padding: 20px;
 }
 
+.card-link {
+  display: block;
+}
+
+.card-link .card {
+  height: 100%;
+}
+
+.card-link:hover .card {
+  border-color: rgba(79, 209, 197, 0.35);
+  background: rgba(79, 209, 197, 0.055);
+}
+
 .card-topline {
   display: flex;
   align-items: center;
@@ -388,6 +401,16 @@ p {
   margin-bottom: 0;
   color: var(--text-muted);
   line-height: 1.62;
+}
+
+.card-action-label {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: 16px;
+  border-bottom: 1px solid rgba(79, 209, 197, 0.55);
+  color: var(--teal);
+  font-size: 0.84rem;
+  font-weight: 760;
 }
 
 .placeholder-layout {
@@ -1211,6 +1234,100 @@ p {
   line-height: 1.6;
 }
 
+.lesson-warning {
+  margin-top: 16px;
+}
+
+.generated-lesson-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.generated-lesson-block {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: rgba(18, 21, 31, 0.86);
+  box-shadow: var(--shadow);
+  padding: 18px;
+  scroll-margin-top: 24px;
+}
+
+.generated-block-header {
+  display: grid;
+  gap: 10px;
+}
+
+.generated-block-header h3 {
+  margin: 10px 0 0;
+  font-size: 1.08rem;
+}
+
+.generated-block-header p,
+.generated-lesson-block p {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.65;
+}
+
+.lesson-content-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lesson-content-list li,
+.lesson-content-item {
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.025);
+  padding: 14px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.lesson-content-item {
+  display: grid;
+  gap: 8px;
+}
+
+.lesson-content-item strong {
+  color: var(--text);
+}
+
+.lesson-content-item span {
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+.citation-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.citation-pill {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  border: 1px solid rgba(79, 209, 197, 0.28);
+  border-radius: 999px;
+  background: var(--teal-soft);
+  padding: 6px 9px;
+  color: var(--teal);
+  font-size: 0.72rem;
+  font-weight: 760;
+}
+
+.citation-pill:hover {
+  border-color: rgba(79, 209, 197, 0.5);
+}
+
 .compact-actions {
   margin-top: 12px;
 }
@@ -1254,6 +1371,7 @@ p {
   .detail-grid,
   .chat-evidence-grid,
   .week-grid,
+  .generated-lesson-grid,
   .lesson-detail-layout,
   .assessment-layout,
   .practice-mode-grid,

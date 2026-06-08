@@ -1,19 +1,27 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
-import { getCurriculumSummary } from "@/lib/curriculum";
+import { getCurriculumSummary, getDailyLessonByDayNumber } from "@/lib/curriculum";
 import { getSourceLibraryStats } from "@/lib/sources";
 
 export const dynamic = "force-dynamic";
 
 export default async function PracticePage() {
   const [stats, summary] = await Promise.all([getSourceLibraryStats(), Promise.resolve(getCurriculumSummary())]);
+  const currentLesson = getDailyLessonByDayNumber(1);
 
   const practiceModes = [
     {
-      title: "Daily lesson review",
-      status: `${summary.lessonCount} lesson shells`,
+      title: "Today's sentence-building block",
+      status: currentLesson ? `Day ${currentLesson.dayNumber}` : "Roadmap",
       copy:
-        "Review unlocked daily grammar blocks. Spanish drills stay placeholder-only until PDF citations support them.",
+        "Jump straight into the current lesson's sentence-building practice. It displays only PDF-grounded content or a safe missing-source warning.",
+      href: currentLesson ? `/learn/day/${currentLesson.dayNumber}#sentence-building` : "/learn"
+    },
+    {
+      title: "Daily lesson review",
+      status: `${summary.lessonCount} lessons`,
+      copy:
+        "Review unlocked daily grammar blocks. Spanish drills stay source-gated unless PDF citations support them.",
       href: "/learn"
     },
     {

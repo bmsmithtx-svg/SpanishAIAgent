@@ -159,3 +159,84 @@ export type SpanishAgentAssessmentResponse = {
   unsupportedBySources: boolean;
   progressionUnlockAllowed: boolean;
 };
+
+export type LessonGenerationStatus =
+  | "generated"
+  | "missing_source"
+  | "openai_not_configured"
+  | "generation_failed";
+
+export type GeneratedLessonCitation = {
+  fileName: string;
+  pageNumber: number;
+  documentId: string;
+  pageId?: string;
+  chunkId?: string;
+  citationLabel: string;
+  snippet: string;
+};
+
+export type GeneratedLessonBlock = {
+  title: string;
+  minutes: number;
+  objective: string;
+  instructions: string;
+  citations: GeneratedLessonCitation[];
+  missingSourceWarning?: string;
+};
+
+export type GeneratedVocabularyItem = {
+  term: string;
+  meaning: string;
+  usageNote?: string;
+  citations: GeneratedLessonCitation[];
+};
+
+export type GeneratedGrammarExplanation = {
+  summary: string;
+  keyPoints: string[];
+  citations: GeneratedLessonCitation[];
+};
+
+export type GeneratedSentencePracticeItem = {
+  prompt: string;
+  learnerTask: string;
+  answerGuidance?: string;
+  citations: GeneratedLessonCitation[];
+};
+
+export type GeneratedChallenge = {
+  prompt: string;
+  typedResponseInstructions: string;
+  speakAloudInstructions: string;
+  citations: GeneratedLessonCitation[];
+};
+
+export type GeneratedDailyLesson = {
+  dayNumber: number;
+  weekNumber: number;
+  title: string;
+  grammarFocus: string;
+  vocabularyFocus: string;
+  generatedAt: string;
+  status: LessonGenerationStatus;
+  retrievalMode: "hybrid" | "keyword" | "none";
+  semanticRetrievalUsed: boolean;
+  sourceGrounded: boolean;
+  citations: GeneratedLessonCitation[];
+  vocabularyWarmup: GeneratedLessonBlock & {
+    items: GeneratedVocabularyItem[];
+  };
+  grammarConcept: GeneratedLessonBlock & {
+    explanation: GeneratedGrammarExplanation;
+  };
+  sentenceBuilding: GeneratedLessonBlock & {
+    practiceItems: GeneratedSentencePracticeItem[];
+  };
+  typedSpeakAloudChallenge: GeneratedLessonBlock & {
+    challenge: GeneratedChallenge;
+  };
+  limitations: string[];
+  missingSourceWarning?: string;
+  error?: string;
+};

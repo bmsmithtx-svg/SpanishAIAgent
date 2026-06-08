@@ -1,11 +1,8 @@
 import { notFound } from "next/navigation";
 import { DailyLessonView } from "@/components/daily-lesson-view";
 import { PageHeader } from "@/components/page-header";
-import {
-  getAllDailyLessons,
-  getDailyLessonByDayNumber,
-  getLessonSourceContext
-} from "@/lib/curriculum";
+import { generateDailyLesson } from "@/lib/agent/daily-lesson-generator";
+import { getAllDailyLessons, getDailyLessonByDayNumber } from "@/lib/curriculum";
 
 export const dynamic = "force-dynamic";
 
@@ -32,26 +29,26 @@ export default async function LessonPage({ params }: LessonPageProps) {
   const lessons = getAllDailyLessons();
   const previousLesson = lessons.find((candidate) => candidate.dayNumber === dayNumber - 1) ?? null;
   const nextLesson = lessons.find((candidate) => candidate.dayNumber === dayNumber + 1) ?? null;
-  const sourceContext = await getLessonSourceContext(lesson);
+  const { generatedLesson } = await generateDailyLesson(dayNumber);
 
   return (
     <div className="page">
       <PageHeader
         eyebrow={`Day ${lesson.dayNumber}`}
         title={lesson.title}
-        description="This daily lesson shell follows the 20-minute grammar-first format. Spanish examples, explanations, vocabulary, and practice remain placeholders until uploaded PDFs support the exact content with file/page citations."
+        description="This daily lesson follows the 20-minute grammar-first format. Real Spanish examples, explanations, vocabulary, and practice are shown only when retrieved PDF chunks support the content with file/page citations."
         badges={[
           { label: `Week ${lesson.weekNumber}`, tone: "teal" },
           { label: "20 minutes", tone: "gold" },
-          { label: "Source-gated", tone: "rose" }
+          { label: generatedLesson.sourceGrounded ? "PDF-grounded" : "Source warning", tone: generatedLesson.sourceGrounded ? "green" : "rose" }
         ]}
       />
 
       <DailyLessonView
         lesson={lesson}
+        generatedLesson={generatedLesson}
         nextLesson={nextLesson}
         previousLesson={previousLesson}
-        sourceContext={sourceContext}
       />
     </div>
   );
