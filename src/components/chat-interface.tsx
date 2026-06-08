@@ -296,7 +296,7 @@ export function ChatInterface({
 
           {latestAnswer ? (
             <span className={`badge ${latestAnswer.semanticRetrievalUsed ? "green" : "gold"}`}>
-              Semantic used: {latestAnswer.semanticRetrievalUsed ? "yes" : "no"}
+              Local semantic scoring over stored chunk embeddings: {latestAnswer.semanticRetrievalUsed ? "yes" : "no"}
             </span>
           ) : null}
 
@@ -328,7 +328,7 @@ export function ChatInterface({
 
 function retrievalLabel(mode: RetrievalMode) {
   return {
-    hybrid: "Hybrid keyword + local scoring",
+    hybrid: "Keyword + local semantic scoring over stored chunk embeddings",
     keyword: "Keyword retrieval",
     none: "No retrieval"
   }[mode];
@@ -340,7 +340,7 @@ function retrievalTone(mode: RetrievalMode) {
 
 function scoreLabel(source: RetrievedSourcePreview, mode?: RetrievalMode) {
   if (mode === "hybrid") {
-    return `local score ${source.semanticScore.toFixed(3)}`;
+    return `local semantic score ${source.semanticScore.toFixed(3)}`;
   }
 
   return `keyword ${Math.round(source.keywordScore)}`;

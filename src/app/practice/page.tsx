@@ -1,28 +1,90 @@
-import { PlaceholderPage } from "@/components/placeholder-page";
+import Link from "next/link";
+import { PageHeader } from "@/components/page-header";
+import { getCurriculumSummary } from "@/lib/curriculum";
+import { getSourceLibraryStats } from "@/lib/sources";
 
-export default function PracticePage() {
+export const dynamic = "force-dynamic";
+
+export default async function PracticePage() {
+  const [stats, summary] = await Promise.all([getSourceLibraryStats(), Promise.resolve(getCurriculumSummary())]);
+
+  const practiceModes = [
+    {
+      title: "Daily lesson review",
+      status: `${summary.lessonCount} lesson shells`,
+      copy:
+        "Review unlocked daily grammar blocks. Spanish drills stay placeholder-only until PDF citations support them.",
+      href: "/learn"
+    },
+    {
+      title: "Family conversation rehearsal",
+      status: "PDF-gated",
+      copy:
+        "Future conversation prompts will use retrieved source excerpts for practical family communication.",
+      href: "/chat"
+    },
+    {
+      title: "Weekly assessment prep",
+      status: `${summary.assessmentCount} gates`,
+      copy:
+        "Prepare for each weekly gate after the five daily lessons and review day are complete.",
+      href: "/learn/week/1/assessment"
+    }
+  ];
+
   return (
-    <PlaceholderPage
-      eyebrow="Practice mode"
-      title="Practice for everyday family communication"
-      description="Practice sessions will be built from cited PDF material, with no unsupported prompts or invented examples."
-      primaryTitle="Practice engine placeholder"
-      primaryCopy="Future drills, review prompts, and conversation exercises will require linked source pages before they appear."
-      secondaryTitle="Practice workflow"
-      steps={[
-        {
-          title: "Select source-backed skill",
-          copy: "Choose a practice focus only when the library has supporting PDF passages."
-        },
-        {
-          title: "Generate practice items",
-          copy: "Create practice from retrieved source pages and attach citations."
-        },
-        {
-          title: "Review with evidence",
-          copy: "Show which file and page supported each answer or correction."
-        }
-      ]}
-    />
+    <div className="page">
+      <PageHeader
+        eyebrow="Practice mode"
+        title="Practice that follows the daily grammar path"
+        description="Practice is now organized around the local lesson roadmap. Real drills, corrections, and conversation prompts still require uploaded PDF support and file/page citations."
+        badges={[
+          { label: stats.sourceIngestionReady ? "Sources indexed" : "Waiting for PDFs", tone: stats.sourceIngestionReady ? "green" : "gold" },
+          { label: "No invented drills", tone: "rose" }
+        ]}
+      />
+
+      <section className="practice-mode-grid" aria-label="Practice modes">
+        {practiceModes.map((mode) => (
+          <article className="placeholder-panel" key={mode.title}>
+            <span className="badge teal">{mode.status}</span>
+            <h2>{mode.title}</h2>
+            <p>{mode.copy}</p>
+            <Link className="secondary-button inline-action" href={mode.href}>
+              Open
+            </Link>
+          </article>
+        ))}
+      </section>
+
+      <section className="placeholder-layout section-offset" aria-label="Practice guardrails">
+        <article className="placeholder-panel">
+          <span className="badge gold">Current behavior</span>
+          <h2>Practice is structured, not generated</h2>
+          <p>
+            The app can now route practice around daily lessons and weekly assessments.
+            It does not generate Spanish vocabulary, grammar explanations, examples, or drills
+            unless source retrieval can support them from uploaded PDFs.
+          </p>
+        </article>
+        <aside className="placeholder-panel">
+          <span className="badge green">Source readiness</span>
+          <div className="stack readiness-stack">
+            <div className="timeline-item">
+              <strong>PDFs imported</strong>
+              <span>{stats.sourceDocumentCount}</span>
+            </div>
+            <div className="timeline-item">
+              <strong>Searchable chunks</strong>
+              <span>{stats.sourceChunkCount}</span>
+            </div>
+            <div className="timeline-item">
+              <strong>Practice generation</strong>
+              <span>{stats.sourceIngestionReady ? "Ready for source retrieval design" : "Needs PDF source chunks"}</span>
+            </div>
+          </div>
+        </aside>
+      </section>
+    </div>
   );
 }

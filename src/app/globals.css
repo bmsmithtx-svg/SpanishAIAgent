@@ -989,6 +989,248 @@ p {
   margin-top: 10px;
 }
 
+.curriculum-workspace,
+.lesson-side-stack {
+  display: grid;
+  gap: 16px;
+}
+
+.curriculum-summary-grid,
+.practice-mode-grid,
+.helper-card-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.practice-mode-grid,
+.helper-card-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.helper-card-grid {
+  margin-bottom: 18px;
+}
+
+.helper-card {
+  min-height: 220px;
+}
+
+.status-metric-grid {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.status-metric-grid .status-metric {
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.025);
+  padding: 12px;
+}
+
+.curriculum-mini-panel h2,
+.placeholder-panel h2 {
+  overflow-wrap: anywhere;
+}
+
+.lesson-time-grid,
+.lesson-meta-grid,
+.rubric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.lesson-time-grid span,
+.lesson-meta-grid div,
+.rubric-grid div {
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.025);
+  padding: 12px;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.lesson-meta-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 18px 0;
+}
+
+.lesson-meta-grid span,
+.rubric-grid span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--text-subtle);
+  font-size: 0.76rem;
+  font-weight: 760;
+}
+
+.lesson-meta-grid strong,
+.rubric-grid strong {
+  display: block;
+  color: var(--text);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.week-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.week-card,
+.assessment-chat-panel {
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: rgba(18, 21, 31, 0.86);
+  box-shadow: var(--shadow);
+  padding: 18px;
+}
+
+.week-card {
+  display: grid;
+  gap: 14px;
+}
+
+.week-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.week-card h3 {
+  margin: 10px 0 0;
+  font-size: 1.08rem;
+  line-height: 1.35;
+}
+
+.week-card p {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+.lesson-list,
+.week-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.lesson-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 54px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.025);
+  padding: 10px;
+}
+
+.lesson-row:hover {
+  border-color: rgba(79, 209, 197, 0.3);
+}
+
+.lesson-row span,
+.lesson-row em {
+  color: var(--text-subtle);
+  font-size: 0.78rem;
+  font-style: normal;
+  font-weight: 760;
+}
+
+.lesson-row strong {
+  min-width: 0;
+  color: var(--text);
+  font-size: 0.9rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.lesson-row.locked {
+  opacity: 0.68;
+}
+
+.lesson-row.available,
+.lesson-row.in_progress {
+  border-color: rgba(246, 200, 95, 0.28);
+}
+
+.lesson-row.complete {
+  border-color: rgba(141, 223, 140, 0.28);
+  background: var(--green-soft);
+}
+
+.small-action {
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 0.78rem;
+}
+
+.lesson-detail-layout,
+.assessment-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
+  gap: 16px;
+}
+
+.lesson-source-section,
+.assessment-chat-panel,
+.assessment-source-section {
+  grid-column: 1 / -1;
+}
+
+.lesson-block-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.lesson-block {
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.025);
+  padding: 16px;
+}
+
+.lesson-block h3 {
+  margin: 12px 0 8px;
+  font-size: 1rem;
+}
+
+.lesson-block p {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.compact-actions {
+  margin-top: 12px;
+}
+
+.assessment-chat-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.assessment-messages {
+  max-height: 430px;
+}
+
+.assessment-grade-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 @media (max-width: 980px) {
   .shell {
     grid-template-columns: 1fr;
@@ -1010,7 +1252,12 @@ p {
   .placeholder-layout,
   .source-toolbar,
   .detail-grid,
-  .chat-evidence-grid {
+  .chat-evidence-grid,
+  .week-grid,
+  .lesson-detail-layout,
+  .assessment-layout,
+  .practice-mode-grid,
+  .helper-card-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1023,6 +1270,12 @@ p {
   }
 
   .source-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .curriculum-summary-grid,
+  .lesson-block-grid,
+  .lesson-time-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -1040,6 +1293,11 @@ p {
   .card-grid,
   .source-summary-grid,
   .source-meta-grid,
+  .curriculum-summary-grid,
+  .lesson-time-grid,
+  .lesson-meta-grid,
+  .lesson-block-grid,
+  .rubric-grid,
   .compact-meta,
   .search-row,
   .mode-selector,
@@ -1065,5 +1323,18 @@ p {
   .message.assistant {
     margin-left: 0;
     margin-right: 0;
+  }
+
+  .lesson-row {
+    grid-template-columns: 1fr;
+  }
+
+  .assessment-grade-actions {
+    justify-content: stretch;
+  }
+
+  .assessment-grade-actions .primary-button,
+  .assessment-grade-actions .secondary-button {
+    width: 100%;
   }
 }

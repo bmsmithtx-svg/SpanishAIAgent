@@ -1,28 +1,25 @@
-import { PlaceholderPage } from "@/components/placeholder-page";
+import { CurriculumRoadmap } from "@/components/curriculum-roadmap";
+import { PageHeader } from "@/components/page-header";
+import { getCurriculumSections, getCurriculumSummary } from "@/lib/curriculum";
 
 export default function LearnPage() {
+  const sections = getCurriculumSections();
+  const summary = getCurriculumSummary();
+
   return (
-    <PlaceholderPage
-      eyebrow="Lesson roadmap"
-      title="PDF-grounded lesson roadmap"
-      description="Roadmap modules will be generated only after the app can trace each lesson back to uploaded PDF pages."
-      primaryTitle="Lessons are intentionally gated"
-      primaryCopy="The learning path will stay empty until source pages have been indexed and can support each lesson objective with citations."
-      secondaryTitle="Roadmap stages"
-      steps={[
-        {
-          title: "Source audit",
-          copy: "Confirm which uploaded pages can support beginner-friendly learning goals."
-        },
-        {
-          title: "Lesson grouping",
-          copy: "Organize supported material into daily study blocks with citation coverage."
-        },
-        {
-          title: "Progress tracking",
-          copy: "Record completed source-backed lessons and identify review areas."
-        }
-      ]}
-    />
+    <div className="page">
+      <PageHeader
+        eyebrow="Lesson roadmap"
+        title="Grammar-first daily Spanish roadmap"
+        description="A local-first eight-week study structure is ready for everyday family communication. Real Spanish teaching content remains placeholder-gated until uploaded PDFs provide source-backed vocabulary, grammar, examples, and citations."
+        badges={[
+          { label: `${summary.lessonCount} daily lessons`, tone: "teal" },
+          { label: `${summary.assessmentCount} weekly assessments`, tone: "gold" },
+          { label: "PDF-only content rule", tone: "rose" }
+        ]}
+      />
+
+      <CurriculumRoadmap sections={sections} />
+    </div>
   );
 }

@@ -62,41 +62,54 @@ export type EmbeddingBackfillResult = EmbeddingStatus & {
 export async function getEmbeddingStatus(): Promise<EmbeddingStatus> {
   const embeddingModel = getEmbeddingModel();
   const embeddingDimensions = getEmbeddingDimensions();
-  const [totalChunks, embeddedChunks, missingEmbeddings, failedEmbeddings] = await Promise.all([
-    prisma.spanishSourceChunk.count(),
-    prisma.spanishSourceChunk.count({
-      where: {
-        embeddingJson: {
-          not: null
-        },
-        embeddingModel,
-        embeddingDimensions
-      }
-    }),
-    prisma.spanishSourceChunk.count({
-      where: chunkNeedsEmbeddingWhere(embeddingModel, embeddingDimensions)
-    }),
-    prisma.spanishSourceChunk.count({
-      where: {
-        embeddingError: {
-          not: null
-        },
-        embeddingJson: null
-      }
-    })
-  ]);
-
-  return {
-    totalChunks,
-    embeddedChunks,
-    missingEmbeddings,
-    failedEmbeddings,
+  const emptyStatus = {
+    totalChunks: 0,
+    embeddedChunks: 0,
+    missingEmbeddings: 0,
+    failedEmbeddings: 0,
     embeddingModel,
     embeddingDimensions,
-    semanticRetrievalReady: embeddedChunks > 0,
+    semanticRetrievalReady: false,
     defaultBackfillLimit: getEmbeddingBackfillDefaultLimit(),
     maxBackfillLimit: getEmbeddingBackfillMaxLimit()
   };
+
+  try {
+    const [totalChunks, embeddedChunks, missingEmbeddings, failedEmbeddings] = await Promise.all([
+      prisma.spanishSourceChunk.count(),
+      prisma.spanishSourceChunk.count({
+        where: {
+          embeddingJson: {
+            not: null
+          },
+          embeddingModel,
+          embeddingDimensions
+        }
+      }),
+      prisma.spanishSourceChunk.count({
+        where: chunkNeedsEmbeddingWhere(embeddingModel, embeddingDimensions)
+      }),
+      prisma.spanishSourceChunk.count({
+        where: {
+          embeddingError: {
+            not: null
+          },
+          embeddingJson: null
+        }
+      })
+    ]);
+
+    return {
+      ...emptyStatus,
+      totalChunks,
+      embeddedChunks,
+      missingEmbeddings,
+      failedEmbeddings,
+      semanticRetrievalReady: embeddedChunks > 0
+    };
+  } catch {
+    return emptyStatus;
+  }
 }
 
 export async function backfillChunkEmbeddings(

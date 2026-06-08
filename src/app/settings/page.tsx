@@ -1,6 +1,8 @@
+import { CurriculumStatusPanel } from "@/components/curriculum-status-panel";
 import { EmbeddingBackfillPanel } from "@/components/embedding-backfill-panel";
 import { PageHeader } from "@/components/page-header";
 import { getOpenAIModel } from "@/lib/agent/openai-client";
+import { getCurriculumSections } from "@/lib/curriculum";
 import {
   getEmbeddingBackfillDefaultLimit,
   getEmbeddingBackfillMaxLimit,
@@ -21,6 +23,7 @@ export default async function SettingsPage() {
   const model = getOpenAIModel();
   const backfillDefaultLimit = getEmbeddingBackfillDefaultLimit();
   const backfillMaxLimit = getEmbeddingBackfillMaxLimit();
+  const sections = getCurriculumSections();
 
   return (
     <div className="page">
@@ -31,7 +34,7 @@ export default async function SettingsPage() {
         badges={[
           { label: hasOpenAIKey ? "OpenAI key detected" : "OpenAI key missing", tone: hasOpenAIKey ? "green" : "rose" },
           { label: stats.databaseConnected ? "Database connected" : "Database missing", tone: stats.databaseConnected ? "green" : "rose" },
-          { label: embeddingStatus.semanticRetrievalReady ? "Local scoring ready" : "Keyword fallback", tone: embeddingStatus.semanticRetrievalReady ? "green" : "gold" },
+          { label: embeddingStatus.semanticRetrievalReady ? "Local semantic scoring ready" : "Keyword fallback", tone: embeddingStatus.semanticRetrievalReady ? "green" : "gold" },
           { label: chatReady ? "Chat ready" : "Chat not ready", tone: chatReady ? "green" : "gold" }
         ]}
       />
@@ -80,7 +83,7 @@ export default async function SettingsPage() {
               <strong>Retrieval</strong>
               <span>
                 {embeddingStatus.semanticRetrievalReady
-                  ? "Hybrid keyword + local semantic scoring ready"
+                  ? "Keyword + local semantic scoring over stored chunk embeddings ready"
                   : retrievalReady
                     ? "Keyword fallback ready"
                     : "Not ready"}
@@ -111,6 +114,24 @@ export default async function SettingsPage() {
           <div className="stack">
             <span className="code-pill">GET /api/sources/embeddings/status</span>
             <span className="code-pill">POST /api/sources/embeddings/backfill</span>
+          </div>
+        </aside>
+      </section>
+
+      <section className="detail-grid section-offset" aria-label="Curriculum settings">
+        <CurriculumStatusPanel sections={sections} />
+        <aside className="placeholder-panel">
+          <span className="badge teal">Progress storage</span>
+          <h2>Local-first curriculum state</h2>
+          <p>
+            Daily lesson completion, review completion, and placeholder assessment attempts
+            are stored in browser localStorage for this MVP. No Prisma progress model has
+            been added yet, so switching browsers or clearing site data resets progress.
+          </p>
+          <div className="stack">
+            <span className="code-pill">localStorage curriculum progress</span>
+            <span className="code-pill">No database progress writes</span>
+            <span className="code-pill">PDF-only lesson content</span>
           </div>
         </aside>
       </section>

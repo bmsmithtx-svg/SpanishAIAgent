@@ -1,34 +1,38 @@
+import { CurriculumStatusPanel } from "@/components/curriculum-status-panel";
 import { FeatureCard } from "@/components/feature-card";
 import { PageHeader } from "@/components/page-header";
+import { getCurriculumSections, getCurriculumSummary } from "@/lib/curriculum";
 import { getSourceLibraryStats } from "@/lib/sources";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const stats = await getSourceLibraryStats();
+  const sections = getCurriculumSections();
+  const curriculumSummary = getCurriculumSummary();
   const dashboardCards = [
     {
       index: "01",
       title: "Today's Spanish lesson",
-      status: stats.sourceIngestionReady ? "Sources ready" : "Waiting for PDFs",
+      status: "Day 1 shell",
       description:
-        "A focused daily lesson will appear after PDF chunks are available and lesson citations can be attached.",
+        "The first 20-minute lesson shell is ready, with Spanish content hidden until PDF citations can support it.",
       tone: "teal" as const
     },
     {
       index: "02",
       title: "Family conversation practice",
-      status: "Retrieval next",
+      status: "Roadmap-linked",
       description:
-        "Practice flows will be built from retrieved source chunks, using only supported PDF passages.",
+        "Practice now points back to the daily grammar path and will use only supported PDF passages when generated.",
       tone: "gold" as const
     },
     {
       index: "03",
       title: "Grammar foundation",
-      status: `${stats.sourcePageCount} pages`,
+      status: `${curriculumSummary.weekCount} weeks`,
       description:
-        "Grammar explanations will stay locked to uploaded source pages and cite the exact file and page.",
+        `${curriculumSummary.lessonCount} daily lesson shells are organized into a grammar-first sequence with weekly gates.`,
       tone: "green" as const
     },
     {
@@ -105,6 +109,24 @@ export default async function DashboardPage() {
           <div className="status-metric">
             <span className="status-label">Database</span>
             <span className="status-value">{stats.databaseConnected ? "Connected" : "Not connected"}</span>
+          </div>
+        </aside>
+      </section>
+
+      <section className="placeholder-layout section-offset" aria-label="Daily curriculum status">
+        <CurriculumStatusPanel sections={sections} />
+        <aside className="placeholder-panel">
+          <span className="badge gold">Grammar-first plan</span>
+          <h2>Daily study now has a shape</h2>
+          <p>
+            The app now tracks a local eight-week lesson sequence: five daily lessons,
+            a review day, and a weekly assessment gate. It still avoids unsupported Spanish
+            curriculum until the PDF library supplies source context.
+          </p>
+          <div className="stack">
+            <span className="code-pill">{curriculumSummary.lessonCount} daily lessons</span>
+            <span className="code-pill">{curriculumSummary.assessmentCount} assessments</span>
+            <span className="code-pill">localStorage progress</span>
           </div>
         </aside>
       </section>

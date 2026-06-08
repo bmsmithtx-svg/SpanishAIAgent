@@ -142,6 +142,22 @@ Successful tutor answers include structured citations with:
 
 The visible citation label format is `File Name, page X`.
 
+## Grammar-First Daily Curriculum
+
+The `/learn` route now includes the first local-first curriculum structure for grammar-first daily study:
+
+- 8 seeded weeks in `src/lib/curriculum`.
+- 5 daily lessons per week, for 40 daily lesson shells total.
+- Each daily lesson is structured as 20 minutes: 5 minutes vocabulary, 5 minutes grammar, 7 minutes sentence practice, and 3 minutes challenge.
+- Each week includes a review day and a weekly assessment gate.
+- Week 2 and later remain locked until the previous week's five lessons, review day, and assessment pass are recorded.
+- Progress is stored in browser `localStorage` for the MVP because no Prisma progress model exists yet.
+- Real Spanish lesson content remains placeholder-only until uploaded PDFs provide source-backed material and citations.
+
+The curriculum source hook is `getLessonSourceContext(lesson)` in `src/lib/curriculum/source-context.ts`. It prepares future lesson generation by retrieving local PDF chunks and converting them into file/page source references. The hook must not be used to generate Spanish teaching content unless the retrieved PDFs support that content.
+
+Weekly assessment APIs are placeholders only. They do not call OpenAI and do not perform real grading yet. Future assessment prompts, feedback, grading rationale, and progression decisions must use only uploaded PDF context and cite file/page references.
+
 ## Git Safety
 
 Raw PDFs, local uploads, extracted snapshots, temp files, and local database files are ignored by git:
@@ -162,8 +178,10 @@ Only `.gitkeep` placeholders are tracked inside `local-sources/` so the folder s
 | `/` | Dashboard with source ingestion counts and source library status. |
 | `/library` | Upload PDFs, list imported sources, and search extracted chunks. |
 | `/library/[id]` | Inspect a source document, extracted pages, page counts, and citation labels. |
-| `/learn` | Lesson roadmap placeholder. |
-| `/practice` | Practice mode placeholder. |
+| `/learn` | Grammar-first eight-week roadmap with local lesson/review/assessment locking. |
+| `/learn/day/[dayNumber]` | Daily 20-minute lesson shell with source-context readiness and local completion. |
+| `/learn/week/[weekNumber]/assessment` | Weekly assessment placeholder with local pass/fail flow for progression testing. |
+| `/practice` | Practice mode surface tied to roadmap, chat, and assessment prep placeholders. |
 | `/chat` | Retrieval-grounded Spanish tutor chat. |
 | `/settings` | API, database, retrieval, and chat readiness status. |
 | `/api/sources/upload` | Upload and extract PDF source files. |
@@ -175,6 +193,9 @@ Only `.gitkeep` placeholders are tracked inside `local-sources/` so the folder s
 | `/api/sources/embeddings/backfill` | Dry-runs or embeds a capped batch of missing source chunks without exposing secrets. |
 | `/api/agent/status` | Returns safe agent/source/chat status without exposing secrets. |
 | `/api/agent/chat` | Server-side retrieval-grounded tutor chat endpoint. |
+| `/api/assessment/start` | Starts a weekly assessment placeholder without calling OpenAI. |
+| `/api/assessment/message` | Records an assessment placeholder message without generating Spanish content. |
+| `/api/assessment/grade` | Records a local placeholder pass/fail result for progression testing. |
 
 ## Database Models
 
@@ -195,6 +216,7 @@ Useful indexes are included for file hashes, document/page lookups, page numbers
 ## Source-Grounded Architecture
 
 - `src/lib/sources` contains PDF storage, extraction, chunking, keyword retrieval, local semantic scoring over stored chunk embeddings, embedding backfill, search, citation utilities, and source database helpers.
+- `src/lib/curriculum` contains the eight-week grammar-first seed map, local progress/locking helpers, and future source-context hooks for lessons and assessments.
 - `src/lib/agent` contains OpenAI client setup, embedding helpers, and agent readiness helpers.
 - `src/lib/prompts` contains the PDF-only guardrail prompt draft.
 - `src/types` contains shared source, lesson, practice, citation, and agent response types.
@@ -204,16 +226,18 @@ Useful indexes are included for file hashes, document/page lookups, page numbers
 - Local semantic scoring currently scans JSON embeddings stored in SQLite. This is fine for a small PDF library, but a dedicated vector index may be useful after the source library grows.
 - Embeddings are backfilled manually from `/settings`; automatic embedding on upload is not implemented yet.
 - The tutor has no long-term chat memory.
-- Daily lesson generation is not yet organized by PDF sections.
+- Daily lesson and assessment content is still placeholder-gated. The roadmap exists, but real Spanish education must wait for PDF-supported generation.
+- Curriculum progress is stored in browser `localStorage`, not SQLite, until a future progress model is added.
 - OCR is not implemented for scanned pages with no extractable text.
 
 ## Future Roadmap
 
 - Add automatic embedding after successful PDF upload.
 - Add a vector database or vector extension if SQLite scanning becomes too slow.
-- Generate daily lessons from source-backed PDF sections.
+- Generate daily lessons from source-backed PDF sections while preserving the grammar-first roadmap.
+- Add persistent progress tracking if localStorage becomes too limited.
 - Improve retrieval ranking with page/section metadata.
-- Add progress tracking, practice sessions, and review history.
+- Add source-backed practice sessions and review history.
 - Add source-backed conversation drills and spaced review.
 
 ## Quality Commands
@@ -234,3 +258,15 @@ Recommended checks:
 - `GET /api/sources/embeddings/status`
 - `POST /api/sources/embeddings/backfill` with `{ "limit": 10, "dryRun": true }`
 - `POST /api/sources/embeddings/backfill` with `{ "limit": 10 }` only after approving a real API-credit-using batch
+- `POST /api/assessment/start` with `{ "weekNumber": 1 }`
+- `POST /api/assessment/message` with `{ "weekNumber": 1, "messages": [] }`
+- `POST /api/assessment/grade` with `{ "weekNumber": 1, "placeholderResult": "pass" }`
+
+## Manual Curriculum Checks
+
+- Open `/learn` and confirm week 1 day 1 is available while later lessons are gated.
+- Open `/learn/day/1`, mark the lesson complete, and confirm day 2 becomes available on the roadmap.
+- Complete all five week 1 lesson shells, mark the week 1 review done, and confirm `/learn/week/1/assessment` can start.
+- Record a placeholder fail and confirm week 2 remains locked.
+- Record a placeholder pass and confirm week 2 unlocks locally.
+- Open `/practice`, `/chat`, and `/settings` and confirm they reference the roadmap without bypassing locks or PDF-only content rules.

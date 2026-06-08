@@ -1,8 +1,21 @@
 export type {
+  AssessmentAttempt,
+  AssessmentMessage,
+  CurriculumProgress,
+  CurriculumSection,
+  CurriculumWeek,
+  DailyLesson,
+  LessonBlock,
+  LessonBlockKind,
+  LessonSourceReference,
+  LessonStatus,
+  SpanishAgentAssessmentResponse,
   SpanishAgentResponse,
   SpanishCitation,
   SpanishLesson,
   SpanishPracticeItem,
   SpanishSourceDocument,
-  SpanishSourcePage
+  SpanishSourcePage,
+  WeeklyAssessment,
+  WeeklyReviewDay
 } from "./spanish";
