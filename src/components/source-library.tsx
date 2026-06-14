@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useMemo, useRef, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
 import type { SourceDocumentListItem, SourceSearchResult } from "@/lib/sources";
 
 type SourceLibraryProps = {
@@ -28,12 +28,9 @@ export function SourceLibrary({ initialDocuments }: SourceLibraryProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [query, setQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SourceSearchResult[]>([]);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [searchMessage, setSearchMessage] = useState("");
   const [isSearching, setIsSearching] = useState(false);
-
-  const completedCount = useMemo(
-    () => documents.filter((document) => document.processingStatus === "completed").length,
-    [documents]
-  );
 
   async function refreshDocuments() {
     const response = await fetch("/api/sources", {
@@ -90,10 +87,13 @@ export function SourceLibrary({ initialDocuments }: SourceLibraryProps) {
 
     if (!query.trim()) {
       setSearchResults([]);
+      setHasSearched(false);
+      setSearchMessage("Enter a search term.");
       return;
     }
 
     setIsSearching(true);
+    setSearchMessage("");
 
     try {
       const response = await fetch(`/api/sources/search?q=${encodeURIComponent(query)}`, {
@@ -101,6 +101,12 @@ export function SourceLibrary({ initialDocuments }: SourceLibraryProps) {
       });
       const payload = (await response.json()) as { results: SourceSearchResult[] };
       setSearchResults(payload.results ?? []);
+      setHasSearched(true);
+      setSearchMessage("");
+    } catch (error) {
+      setSearchResults([]);
+      setHasSearched(true);
+      setSearchMessage(error instanceof Error ? error.message : "Search failed.");
     } finally {
       setIsSearching(false);
     }
@@ -110,14 +116,7 @@ export function SourceLibrary({ initialDocuments }: SourceLibraryProps) {
     <div className="library-workspace">
       <section className="source-toolbar" aria-label="Source library tools">
         <form className="tool-panel" onSubmit={handleUpload}>
-          <div>
-            <span className="badge teal">Upload PDFs</span>
-            <h2>Add source documents</h2>
-            <p>
-              Raw PDFs are saved locally under <span className="inline-code">local-sources/pdfs</span>
-              and ignored by git. Extraction records are stored in SQLite for development.
-            </p>
-          </div>
+          <h2>Upload</h2>
           <input
             ref={fileInputRef}
             className="file-input"
@@ -126,25 +125,18 @@ export function SourceLibrary({ initialDocuments }: SourceLibraryProps) {
             multiple
           />
           <button className="primary-button" disabled={isUploading} type="submit">
-            {isUploading ? "Extracting..." : "Upload and Extract"}
+            {isUploading ? "Uploading..." : "Upload PDFs"}
           </button>
           {uploadMessage ? <p className="form-message">{uploadMessage}</p> : null}
         </form>
 
         <form className="tool-panel" onSubmit={handleSearch}>
-          <div>
-            <span className="badge gold">Keyword search</span>
-            <h2>Search extracted chunks</h2>
-            <p>
-              Search runs only across extracted PDF chunks. It does not use embeddings or
-              AI-generated Spanish content.
-            </p>
-          </div>
+          <h2>Search</h2>
           <div className="search-row">
             <input
               className="text-input"
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search imported PDF text"
+              placeholder="Search PDFs"
               type="search"
               value={query}
             />
@@ -152,33 +144,37 @@ export function SourceLibrary({ initialDocuments }: SourceLibraryProps) {
               {isSearching ? "Searching..." : "Search"}
             </button>
           </div>
+          {searchMessage ? <p className="form-message">{searchMessage}</p> : null}
+          {hasSearched ? (
+            <div className="inline-search-results">
+              <span className="result-count">{searchResults.length} results</span>
+              {searchResults.length === 0 ? (
+                <div className="empty-state compact-empty-state">
+                  <strong>No results found</strong>
+                </div>
+              ) : (
+                <div className="result-list">
+                  {searchResults.map((result) => (
+                    <Link
+                      className="result-card"
+                      href={`/library/${result.documentId}#page-${result.pageNumber}`}
+                      key={result.chunkId}
+                    >
+                      <span className="badge gold">{result.citationLabel}</span>
+                      <p>{result.preview}</p>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : null}
         </form>
-      </section>
-
-      <section className="source-summary-grid" aria-label="Source library summary">
-        <div className="summary-tile">
-          <span>Uploaded PDFs</span>
-          <strong>{documents.length}</strong>
-        </div>
-        <div className="summary-tile">
-          <span>Completed</span>
-          <strong>{completedCount}</strong>
-        </div>
-        <div className="summary-tile">
-          <span>Pages</span>
-          <strong>{documents.reduce((total, document) => total + document.pageRecordCount, 0)}</strong>
-        </div>
-        <div className="summary-tile">
-          <span>Chunks</span>
-          <strong>{documents.reduce((total, document) => total + document.chunkCount, 0)}</strong>
-        </div>
       </section>
 
       <section className="source-section" aria-label="Imported source documents">
         <div className="section-heading-row">
           <div>
-            <span className="badge green">Imported sources</span>
-            <h2>PDF source documents</h2>
+            <h2>Sources</h2>
           </div>
           <button className="ghost-button" onClick={refreshDocuments} type="button">
             Refresh
@@ -187,8 +183,7 @@ export function SourceLibrary({ initialDocuments }: SourceLibraryProps) {
 
         {documents.length === 0 ? (
           <div className="empty-state">
-            <strong>No PDFs imported yet</strong>
-            <span>Upload a source PDF to create document, page, and chunk records.</span>
+            <strong>No PDFs uploaded yet</strong>
           </div>
         ) : (
           <div className="source-list">
@@ -197,7 +192,7 @@ export function SourceLibrary({ initialDocuments }: SourceLibraryProps) {
                 <div>
                   <span className="badge teal">{document.processingStatus}</span>
                   <h3>{document.originalFileName}</h3>
-                  <p>{document.processingError ?? "Extracted text is available for inspection."}</p>
+                  {document.processingError ? <p>{document.processingError}</p> : null}
                 </div>
                 <dl className="source-meta-grid">
                   <div>
@@ -221,36 +216,6 @@ export function SourceLibrary({ initialDocuments }: SourceLibraryProps) {
                     <dd>{new Date(document.createdAt).toLocaleDateString()}</dd>
                   </div>
                 </dl>
-              </Link>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section className="source-section" aria-label="Search results">
-        <div className="section-heading-row">
-          <div>
-            <span className="badge rose">Search results</span>
-            <h2>Matching source chunks</h2>
-          </div>
-          <span className="result-count">{searchResults.length} results</span>
-        </div>
-
-        {searchResults.length === 0 ? (
-          <div className="empty-state">
-            <strong>No matches shown</strong>
-            <span>Run a keyword search after importing PDFs.</span>
-          </div>
-        ) : (
-          <div className="result-list">
-            {searchResults.map((result) => (
-              <Link
-                className="result-card"
-                href={`/library/${result.documentId}#page-${result.pageNumber}`}
-                key={result.chunkId}
-              >
-                <span className="badge gold">{result.citationLabel}</span>
-                <p>{result.preview}</p>
               </Link>
             ))}
           </div>

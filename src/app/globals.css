@@ -681,6 +681,16 @@ p {
   gap: 10px;
 }
 
+.inline-search-results {
+  display: grid;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.compact-empty-state {
+  padding: 12px;
+}
+
 .source-summary-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
