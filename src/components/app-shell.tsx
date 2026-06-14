@@ -15,6 +15,7 @@ const navItems = [
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const isDashboard = pathname === "/";
 
   return (
     <div className="shell">
@@ -25,7 +26,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
           <div>
             <p className="brand-title">SpanishAIAgent</p>
-            <p className="brand-subtitle">PDF-grounded study</p>
+            {!isDashboard ? <p className="brand-subtitle">PDF-grounded study</p> : null}
           </div>
         </div>
 
@@ -49,19 +50,21 @@ export function AppShell({ children }: { children: ReactNode }) {
           </ul>
         </nav>
 
-        <div className="sidebar-note">
-          <strong>Source rule</strong>
-          <p>
-            Future lessons and tutor answers must be grounded only in uploaded PDFs with
-            file and page citations.
-          </p>
-        </div>
+        {!isDashboard ? (
+          <div className="sidebar-note">
+            <strong>Source rule</strong>
+            <p>
+              Future lessons and tutor answers must be grounded only in uploaded PDFs with
+              file and page citations.
+            </p>
+          </div>
+        ) : null}
       </aside>
 
       <div className="content-area">
         <header className="topbar">
           <p className="topbar-title">SpanishAIAgent</p>
-          <span className="topbar-pill">PDF-only mode</span>
+          {!isDashboard ? <span className="topbar-pill">PDF-only mode</span> : null}
         </header>
         <main>{children}</main>
       </div>

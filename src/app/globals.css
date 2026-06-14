@@ -272,6 +272,79 @@ p {
   margin-bottom: 20px;
 }
 
+.learner-dashboard-page {
+  display: grid;
+  min-height: calc(100vh - 84px);
+  place-items: center;
+}
+
+.learner-dashboard {
+  display: grid;
+  width: min(760px, 100%);
+  gap: 30px;
+}
+
+.learner-meter-block {
+  display: grid;
+  gap: 14px;
+}
+
+.learner-meter-value {
+  color: var(--text);
+  font-size: clamp(2.15rem, 6vw, 4.75rem);
+  font-weight: 840;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.learner-progress-track {
+  position: relative;
+  height: 16px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.learner-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--teal), var(--green));
+}
+
+.learner-dashboard-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  padding-top: 8px;
+}
+
+.learner-dashboard-actions .primary-button,
+.learner-dashboard-actions .secondary-button {
+  min-height: 52px;
+  padding: 0 22px;
+  font-size: 1rem;
+}
+
+.learner-roadmap-link {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.learner-roadmap-link:hover {
+  color: var(--text);
+}
+
+.learner-dashboard-message {
+  width: 100%;
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
 .hero-panel,
 .status-panel,
 .card,
@@ -1503,5 +1576,25 @@ p {
   .assessment-grade-actions .primary-button,
   .assessment-grade-actions .secondary-button {
     width: 100%;
+  }
+
+  .learner-dashboard-page {
+    min-height: calc(100vh - 48px);
+    place-items: start center;
+  }
+
+  .learner-dashboard {
+    gap: 26px;
+  }
+
+  .learner-dashboard-actions,
+  .learner-dashboard-actions .primary-button,
+  .learner-dashboard-actions .secondary-button {
+    width: 100%;
+  }
+
+  .learner-roadmap-link {
+    width: 100%;
+    text-align: center;
   }
 }
