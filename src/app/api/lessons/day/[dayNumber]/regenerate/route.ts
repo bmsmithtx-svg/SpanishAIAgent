@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { getDailyLessonByDayNumber } from "@/lib/curriculum";
 import { generateDailyLesson } from "@/lib/agent/daily-lesson-generator";
 
 export const dynamic = "force-dynamic";
@@ -19,11 +18,11 @@ export async function POST(_request: Request, { params }: LessonRegenerateRouteP
     return NextResponse.json({ error: "A valid dayNumber is required." }, { status: 400 });
   }
 
-  if (!getDailyLessonByDayNumber(dayNumber)) {
+  const result = await generateDailyLesson(dayNumber);
+
+  if (!result.lesson) {
     return NextResponse.json({ error: "Daily lesson not found." }, { status: 404 });
   }
-
-  const result = await generateDailyLesson(dayNumber);
 
   return NextResponse.json({
     regenerated: true,

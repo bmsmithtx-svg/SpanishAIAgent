@@ -3,8 +3,8 @@ import { PageHeader } from "@/components/page-header";
 import { WeeklyAssessmentView } from "@/components/weekly-assessment-view";
 import {
   getAssessmentSourceContext,
+  getGeneratedCurriculumWeekByNumber,
   getWeekByNumber,
-  getWeeklyAssessment
 } from "@/lib/curriculum";
 
 export const dynamic = "force-dynamic";
@@ -23,8 +23,9 @@ export default async function AssessmentPage({ params }: AssessmentPageProps) {
     notFound();
   }
 
-  const week = getWeekByNumber(weekNumber);
-  const assessment = getWeeklyAssessment(weekNumber);
+  const generatedWeek = await getGeneratedCurriculumWeekByNumber(weekNumber);
+  const week = generatedWeek ?? getWeekByNumber(weekNumber);
+  const assessment = week?.assessment ?? null;
 
   if (!week || !assessment) {
     notFound();

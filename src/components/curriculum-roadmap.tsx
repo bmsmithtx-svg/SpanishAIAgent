@@ -1,8 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
-import type { CurriculumSection, LessonStatus } from "@/types";
+import { useMemo, useState } from "react";
+import type {
+  CurriculumGenerationStatus,
+  CurriculumSection,
+  GeneratedCurriculum,
+  GeneratedCurriculumStatusSummary,
+  LessonStatus
+} from "@/types";
 import {
   getAssessmentLockedReason,
   getAssessmentStatus,
@@ -15,18 +21,105 @@ import { useCurriculumProgress } from "@/lib/curriculum/use-curriculum-progress"
 
 type CurriculumRoadmapProps = {
   sections: CurriculumSection[];
+  generatedCurriculum: GeneratedCurriculum | null;
+  statusSummary: GeneratedCurriculumStatusSummary;
 };
 
-export function CurriculumRoadmap({ sections }: CurriculumRoadmapProps) {
+type GenerationApiResponse = {
+  status?: CurriculumGenerationStatus;
+  message?: string;
+  dryRun?: boolean;
+  generatedLessonCount?: number;
+  generatedWeekCount?: number;
+  warning?: string;
+  error?: string;
+};
+
+export function CurriculumRoadmap({
+  sections,
+  generatedCurriculum,
+  statusSummary
+}: CurriculumRoadmapProps) {
   const progress = useCurriculumProgress();
+  const [generationMessage, setGenerationMessage] = useState(statusSummary.message);
+  const [isGenerating, setIsGenerating] = useState(false);
   const summary = useMemo(() => getProgressSummary(sections, progress), [sections, progress]);
+  const isPdfDerived = statusSummary.curriculumMode === "pdf_derived";
 
   function completeReview(weekNumber: number) {
     markReviewComplete(progress, weekNumber);
   }
 
+  async function runGenerator(dryRun: boolean) {
+    if (isGenerating) {
+      return;
+    }
+
+    setIsGenerating(true);
+    setGenerationMessage("");
+
+    try {
+      const response = await fetch("/api/curriculum/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ dryRun })
+      });
+      const payload = (await response.json()) as GenerationApiResponse;
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Curriculum generation failed.");
+      }
+
+      setGenerationMessage(
+        payload.message ??
+          (dryRun ? "Dry run completed without writes." : "Generated curriculum shell build completed.")
+      );
+
+      if (!dryRun && payload.status === "pdf_derived") {
+        window.location.reload();
+      }
+    } catch (error) {
+      setGenerationMessage(error instanceof Error ? error.message : "Curriculum generation failed.");
+    } finally {
+      setIsGenerating(false);
+    }
+  }
+
   return (
     <div className="curriculum-workspace">
+      <section className="curriculum-control-panel" aria-label="Curriculum generation status">
+        <div>
+          <span className={`badge ${isPdfDerived ? "green" : "gold"}`}>{modeLabel(statusSummary.curriculumMode)}</span>
+          <h2>{isPdfDerived ? "PDF-derived roadmap active" : "Seed fallback roadmap active"}</h2>
+          <p>{generationMessage}</p>
+        </div>
+        <div className="curriculum-control-actions">
+          <button
+            className="secondary-button"
+            disabled={isGenerating}
+            onClick={() => runGenerator(true)}
+            type="button"
+          >
+            Dry run shell plan
+          </button>
+          <button
+            className="primary-button"
+            disabled={isGenerating || !statusSummary.sourcePdfsAvailable}
+            onClick={() => runGenerator(false)}
+            type="button"
+          >
+            {generatedCurriculum ? "Rebuild PDF shells" : "Build from PDFs"}
+          </button>
+        </div>
+        <div className="curriculum-control-note">
+          <span>Shell builder only</span>
+          <strong>No OpenAI call and no full lesson generation.</strong>
+          <span>Full daily lesson content is generated later, one lesson at a time, with citations.</span>
+        </div>
+      </section>
+
       <section className="curriculum-summary-grid" aria-label="Curriculum progress summary">
         <article className="summary-tile">
           <span>Current week</span>
@@ -45,6 +138,10 @@ export function CurriculumRoadmap({ sections }: CurriculumRoadmapProps) {
           </strong>
         </article>
         <article className="summary-tile">
+          <span>Mode</span>
+          <strong>{isPdfDerived ? "PDF" : "Seed"}</strong>
+        </article>
+        <article className="summary-tile">
           <span>Assessments</span>
           <strong>
             {summary.passedAssessments}/{summary.totalAssessments}
@@ -55,11 +152,11 @@ export function CurriculumRoadmap({ sections }: CurriculumRoadmapProps) {
       <section className="placeholder-layout" aria-label="Curriculum format">
         <article className="placeholder-panel">
           <span className="badge teal">20-minute lesson shape</span>
-          <h2>Grammar first, source grounded later</h2>
+          <h2>{isPdfDerived ? "Generated shells, content on demand" : "Grammar first, source grounded later"}</h2>
           <p>
             Each daily lesson is structured as five minutes of vocabulary, five minutes of
             grammar, seven minutes of sentence practice, and a three-minute challenge.
-            Spanish content stays hidden until uploaded PDFs can support it with citations.
+            Spanish content appears only after retrieved PDF chunks support it with citations.
           </p>
           <div className="lesson-time-grid">
             <span>5 min vocab</span>
@@ -174,6 +271,14 @@ export function CurriculumRoadmap({ sections }: CurriculumRoadmapProps) {
       ))}
     </div>
   );
+}
+
+function modeLabel(mode: GeneratedCurriculumStatusSummary["curriculumMode"]) {
+  return {
+    seed: "Seed fallback",
+    pdf_derived: "PDF-derived",
+    mixed_fallback: "PDFs ready, seed active"
+  }[mode];
 }
 
 function statusLabel(status: LessonStatus) {

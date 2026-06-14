@@ -2,7 +2,12 @@ import { CurriculumStatusPanel } from "@/components/curriculum-status-panel";
 import { EmbeddingBackfillPanel } from "@/components/embedding-backfill-panel";
 import { PageHeader } from "@/components/page-header";
 import { getOpenAIModel } from "@/lib/agent/openai-client";
-import { getCurriculumSections } from "@/lib/curriculum";
+import {
+  generatedCurriculumToSections,
+  getActiveGeneratedCurriculum,
+  getCurriculumSections,
+  getGeneratedCurriculumStatus
+} from "@/lib/curriculum";
 import {
   getEmbeddingBackfillDefaultLimit,
   getEmbeddingBackfillMaxLimit,
@@ -14,16 +19,20 @@ export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
   const hasOpenAIKey = Boolean(process.env.OPENAI_API_KEY?.trim());
-  const [stats, embeddingStatus] = await Promise.all([
+  const [stats, embeddingStatus, generatedCurriculum, curriculumStatus] = await Promise.all([
     getSourceLibraryStats(),
-    getEmbeddingStatus()
+    getEmbeddingStatus(),
+    getActiveGeneratedCurriculum(),
+    getGeneratedCurriculumStatus()
   ]);
   const retrievalReady = stats.sourceChunkCount > 0;
   const chatReady = hasOpenAIKey && retrievalReady;
   const model = getOpenAIModel();
   const backfillDefaultLimit = getEmbeddingBackfillDefaultLimit();
   const backfillMaxLimit = getEmbeddingBackfillMaxLimit();
-  const sections = getCurriculumSections();
+  const sections = generatedCurriculum
+    ? generatedCurriculumToSections(generatedCurriculum)
+    : getCurriculumSections();
 
   return (
     <div className="page">
@@ -35,6 +44,7 @@ export default async function SettingsPage() {
           { label: hasOpenAIKey ? "OpenAI key detected" : "OpenAI key missing", tone: hasOpenAIKey ? "green" : "rose" },
           { label: stats.databaseConnected ? "Database connected" : "Database missing", tone: stats.databaseConnected ? "green" : "rose" },
           { label: embeddingStatus.semanticRetrievalReady ? "Local semantic scoring ready" : "Keyword fallback", tone: embeddingStatus.semanticRetrievalReady ? "green" : "gold" },
+          { label: generatedCurriculum ? "PDF-derived curriculum" : "Seed fallback", tone: generatedCurriculum ? "green" : "gold" },
           { label: chatReady ? "Chat ready" : "Chat not ready", tone: chatReady ? "green" : "gold" }
         ]}
       />
@@ -51,6 +61,8 @@ export default async function SettingsPage() {
           <div className="stack">
             <span className="code-pill">GET /api/agent/status</span>
             <span className="code-pill">POST /api/agent/chat</span>
+            <span className="code-pill">GET /api/curriculum/status</span>
+            <span className="code-pill">POST /api/curriculum/generate</span>
             <span className="code-pill">DATABASE_URL=file:../local-sources/spanish-ai-agent.db</span>
             <span className="code-pill">OPENAI_MODEL={model}</span>
           </div>
@@ -90,6 +102,10 @@ export default async function SettingsPage() {
               </span>
             </div>
             <div className="timeline-item">
+              <strong>Curriculum</strong>
+              <span>{curriculumStatus.message}</span>
+            </div>
+            <div className="timeline-item">
               <strong>Chat</strong>
               <span>{chatReady ? "Ready for PDF-grounded tutor answers" : "Needs OpenAI key and chunks"}</span>
             </div>
@@ -125,12 +141,14 @@ export default async function SettingsPage() {
           <h2>Local-first curriculum state</h2>
           <p>
             Daily lesson completion, review completion, and placeholder assessment attempts
-            are stored in browser localStorage for this MVP. No Prisma progress model has
-            been added yet, so switching browsers or clearing site data resets progress.
+            are stored in browser localStorage for this MVP. Generated curriculum shells are
+            stored in SQLite, but full daily lesson content is still generated on demand only
+            after source retrieval.
           </p>
           <div className="stack">
             <span className="code-pill">localStorage curriculum progress</span>
-            <span className="code-pill">No database progress writes</span>
+            <span className="code-pill">{curriculumStatus.curriculumMode}</span>
+            <span className="code-pill">{curriculumStatus.generatedLessonCount} generated lesson shells</span>
             <span className="code-pill">PDF-only lesson content</span>
           </div>
         </aside>

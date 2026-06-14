@@ -1,19 +1,33 @@
 import { CurriculumStatusPanel } from "@/components/curriculum-status-panel";
 import { FeatureCard } from "@/components/feature-card";
 import { PageHeader } from "@/components/page-header";
-import { getCurriculumSections, getCurriculumSummary, getDailyLessonByDayNumber } from "@/lib/curriculum";
+import {
+  generatedCurriculumToSections,
+  getActiveGeneratedCurriculum,
+  getCurriculumSections,
+  getCurriculumSummary,
+  getDailyLessonByDayNumber,
+  getGeneratedCurriculumStatus
+} from "@/lib/curriculum";
 import { getEmbeddingStatus, getSourceLibraryStats } from "@/lib/sources";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const [stats, embeddingStatus] = await Promise.all([
+  const [stats, embeddingStatus, generatedCurriculum, curriculumStatus] = await Promise.all([
     getSourceLibraryStats(),
-    getEmbeddingStatus()
+    getEmbeddingStatus(),
+    getActiveGeneratedCurriculum(),
+    getGeneratedCurriculumStatus()
   ]);
-  const sections = getCurriculumSections();
+  const sections = generatedCurriculum
+    ? generatedCurriculumToSections(generatedCurriculum)
+    : getCurriculumSections();
   const curriculumSummary = getCurriculumSummary();
-  const currentLesson = getDailyLessonByDayNumber(1);
+  const currentLesson = sections[0]?.weeks[0]?.lessons[0] ?? getDailyLessonByDayNumber(1);
+  const activeLessonCount = generatedCurriculum?.lessonCount ?? curriculumSummary.lessonCount;
+  const activeWeekCount = generatedCurriculum?.weekCount ?? curriculumSummary.weekCount;
+  const curriculumModeLabel = generatedCurriculum ? "PDF-derived" : "Seed fallback";
   const lessonRetrievalStatus = embeddingStatus.semanticRetrievalReady
     ? "local semantic scoring over stored chunk embeddings ready"
     : stats.sourceChunkCount > 0
@@ -42,9 +56,9 @@ export default async function DashboardPage() {
     {
       index: "03",
       title: "Grammar foundation",
-      status: `${curriculumSummary.weekCount} weeks`,
+      status: `${activeWeekCount} weeks`,
       description:
-        `${curriculumSummary.lessonCount} daily lesson shells are organized into a grammar-first sequence with weekly gates.`,
+        `${activeLessonCount} daily lesson shells are organized into a grammar-first sequence with weekly gates. Current mode: ${curriculumModeLabel}.`,
       tone: "green" as const
     },
     {
@@ -80,6 +94,7 @@ export default async function DashboardPage() {
         description="SpanishAIAgent is being built for practical communication with Mexican family. The future tutor will teach only from uploaded Spanish PDFs and cite the source file name and page number for each lesson, explanation, example, and answer."
         badges={[
           { label: "Dark study workspace", tone: "teal" },
+          { label: curriculumModeLabel, tone: generatedCurriculum ? "green" : "gold" },
           { label: "No outside curriculum", tone: "rose" }
         ]}
       />
@@ -90,8 +105,9 @@ export default async function DashboardPage() {
           <h2>Built for real conversations, with strict source grounding.</h2>
           <p>
             This version now includes local PDF ingestion, page extraction, chunking,
-            source search, and citation labels. Real learning content still appears
-            only after uploaded PDFs have been parsed into cited source records.
+            source search, citation labels, and safe PDF-derived curriculum shell generation.
+            Real learning content still appears only after uploaded PDFs have been parsed
+            into cited source records.
           </p>
           <ul className="rule-list">
             <li>Practical everyday Spanish learning is the product focus.</li>
@@ -119,6 +135,10 @@ export default async function DashboardPage() {
             <span className="status-value">{stats.sourceChunkCount}</span>
           </div>
           <div className="status-metric">
+            <span className="status-label">Curriculum</span>
+            <span className="status-value">{curriculumModeLabel}</span>
+          </div>
+          <div className="status-metric">
             <span className="status-label">Database</span>
             <span className="status-value">{stats.databaseConnected ? "Connected" : "Not connected"}</span>
           </div>
@@ -131,13 +151,14 @@ export default async function DashboardPage() {
           <span className="badge gold">Grammar-first plan</span>
           <h2>Daily study now has a shape</h2>
           <p>
-            The app now tracks a local eight-week lesson sequence: five daily lessons,
-            a review day, and a weekly assessment gate. It still avoids unsupported Spanish
-            curriculum until the PDF library supplies source context.
+            The app now tracks daily lesson shells, review days, and weekly assessment gates.
+            When PDFs are imported, the generated roadmap can expand from source page ranges;
+            without PDFs, the eight-week seed fallback remains active.
           </p>
           <div className="stack">
-            <span className="code-pill">{curriculumSummary.lessonCount} daily lessons</span>
-            <span className="code-pill">{curriculumSummary.assessmentCount} assessments</span>
+            <span className="code-pill">{activeLessonCount} daily lessons</span>
+            <span className="code-pill">{generatedCurriculum?.weekCount ?? curriculumSummary.assessmentCount} assessments</span>
+            <span className="code-pill">{curriculumStatus.curriculumMode}</span>
             <span className="code-pill">localStorage progress</span>
           </div>
         </aside>

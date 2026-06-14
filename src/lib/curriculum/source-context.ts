@@ -22,6 +22,19 @@ export async function getLessonSourceContext(lesson: DailyLesson): Promise<Lesso
 export async function getAssessmentSourceContext(
   assessment: WeeklyAssessment
 ): Promise<LessonSourceContext> {
+  if (assessment.sourceReferences.length > 0) {
+    return {
+      query: assessment.masteryRequirements.join(" "),
+      retrievalMode: "keyword",
+      semanticCandidateCount: 0,
+      keywordCandidateCount: assessment.sourceReferences.length,
+      sourceReferences: assessment.sourceReferences,
+      sources: [],
+      message:
+        "This generated assessment is attached to PDF source references. Future grading must cite only these uploaded file/page windows."
+    };
+  }
+
   return getSourceContext({
     query: assessment.masteryRequirements.join(" "),
     emptyMessage:

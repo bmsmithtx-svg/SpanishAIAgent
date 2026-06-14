@@ -36,3 +36,15 @@ export {
   getLessonSourceContext,
   type LessonSourceContext
 } from "./source-context";
+export {
+  generatePdfDerivedCurriculum,
+  generatedCurriculumToSections,
+  generatedLessonShellToDailyLesson,
+  getActiveGeneratedCurriculum,
+  getGeneratedCurriculumLesson,
+  getGeneratedCurriculumLessonByDayNumber,
+  getGeneratedCurriculumStatus,
+  getGeneratedCurriculumWeekByNumber,
+  listGeneratedCurriculumLessons,
+  type CurriculumGenerationResult
+} from "./generated-curriculum";

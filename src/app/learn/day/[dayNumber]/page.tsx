@@ -2,7 +2,11 @@ import { notFound } from "next/navigation";
 import { DailyLessonView } from "@/components/daily-lesson-view";
 import { PageHeader } from "@/components/page-header";
 import { generateDailyLesson } from "@/lib/agent/daily-lesson-generator";
-import { getAllDailyLessons, getDailyLessonByDayNumber } from "@/lib/curriculum";
+import {
+  generatedLessonShellToDailyLesson,
+  getAllDailyLessons,
+  listGeneratedCurriculumLessons
+} from "@/lib/curriculum";
 
 export const dynamic = "force-dynamic";
 
@@ -20,16 +24,18 @@ export default async function LessonPage({ params }: LessonPageProps) {
     notFound();
   }
 
-  const lesson = getDailyLessonByDayNumber(dayNumber);
+  const { generatedLesson, lesson } = await generateDailyLesson(dayNumber);
 
   if (!lesson) {
     notFound();
   }
 
-  const lessons = getAllDailyLessons();
+  const generatedShells = await listGeneratedCurriculumLessons();
+  const lessons = generatedShells.length > 0
+    ? generatedShells.map(generatedLessonShellToDailyLesson)
+    : getAllDailyLessons();
   const previousLesson = lessons.find((candidate) => candidate.dayNumber === dayNumber - 1) ?? null;
   const nextLesson = lessons.find((candidate) => candidate.dayNumber === dayNumber + 1) ?? null;
-  const { generatedLesson } = await generateDailyLesson(dayNumber);
 
   return (
     <div className="page">

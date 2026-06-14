@@ -70,3 +70,105 @@ model SpanishSourceChunk {
   @@index([embeddingModel])
   @@index([embeddedAt])
 }
+
+model GeneratedCurriculum {
+  id                  String                       @id @default(cuid())
+  title               String
+  status              String                       @default("ready")
+  sourceDocumentCount Int                          @default(0)
+  sourcePageCount     Int                          @default(0)
+  sourceChunkCount    Int                          @default(0)
+  sectionCount        Int                          @default(0)
+  weekCount           Int                          @default(0)
+  lessonCount         Int                          @default(0)
+  sourceCoverageJson  String                       @default("[]")
+  createdAt           DateTime                     @default(now())
+  updatedAt           DateTime                     @updatedAt
+  generatedAt         DateTime                     @default(now())
+  sections            GeneratedCurriculumSection[]
+  lessons             GeneratedCurriculumLesson[]
+  runs                GeneratedCurriculumRun[]
+
+  @@index([status])
+  @@index([generatedAt])
+}
+
+model GeneratedCurriculumSection {
+  id                    String                      @id @default(cuid())
+  curriculumId          String
+  sectionIndex          Int
+  title                 String
+  description           String                      @default("")
+  sourceDocumentIdsJson String                      @default("[]")
+  sourcePageStart       Int?
+  sourcePageEnd         Int?
+  weekStart             Int                         @default(1)
+  weekEnd               Int                         @default(1)
+  lessonCount           Int                         @default(0)
+  sourceReferencesJson  String                      @default("[]")
+  createdAt             DateTime                    @default(now())
+  updatedAt             DateTime                    @updatedAt
+  curriculum            GeneratedCurriculum         @relation(fields: [curriculumId], references: [id], onDelete: Cascade)
+  lessons               GeneratedCurriculumLesson[]
+
+  @@unique([curriculumId, sectionIndex])
+  @@index([curriculumId])
+}
+
+model GeneratedCurriculumLesson {
+  id                    String                      @id @default(cuid())
+  curriculumId          String
+  sectionId             String
+  lessonId              String                      @unique
+  dayNumber             Int
+  weekNumber            Int
+  dayInWeek             Int
+  sectionTitle          String
+  title                 String
+  grammarFocus          String
+  vocabularyFocus       String
+  estimatedMinutes      Int                         @default(20)
+  sourceDocumentIdsJson String                      @default("[]")
+  sourcePageStart       Int?
+  sourcePageEnd         Int?
+  sourceReferencesJson  String                      @default("[]")
+  retrievalQuery        String
+  buildsOnLessonIdsJson String                      @default("[]")
+  masteryGoalsJson      String                      @default("[]")
+  contentGenerated      Boolean                     @default(false)
+  generatedContentId    String?
+  generatedContentAt    DateTime?
+  createdAt             DateTime                    @default(now())
+  updatedAt             DateTime                    @updatedAt
+  curriculum            GeneratedCurriculum         @relation(fields: [curriculumId], references: [id], onDelete: Cascade)
+  section               GeneratedCurriculumSection  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@unique([curriculumId, dayNumber])
+  @@index([curriculumId])
+  @@index([sectionId])
+  @@index([weekNumber])
+  @@index([dayNumber])
+}
+
+model GeneratedCurriculumRun {
+  id                    String              @id @default(cuid())
+  curriculumId          String?
+  status                String
+  message               String              @default("")
+  dryRun                Boolean             @default(false)
+  usedOpenAI            Boolean             @default(false)
+  sourceDocumentCount   Int                 @default(0)
+  sourcePageCount       Int                 @default(0)
+  sourceChunkCount      Int                 @default(0)
+  generatedSectionCount Int                 @default(0)
+  generatedWeekCount    Int                 @default(0)
+  generatedLessonCount  Int                 @default(0)
+  sourceCoverageJson    String              @default("[]")
+  startedAt             DateTime            @default(now())
+  completedAt           DateTime?
+  curriculum            GeneratedCurriculum? @relation(fields: [curriculumId], references: [id], onDelete: SetNull)
+
+  @@index([curriculumId])
+  @@index([status])
+  @@index([startedAt])
+}

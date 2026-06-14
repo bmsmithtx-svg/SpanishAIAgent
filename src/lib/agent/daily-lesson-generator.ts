@@ -1,5 +1,7 @@
 import type {
+  CurriculumSourceReference,
   DailyLesson,
+  GeneratedCurriculumLessonShell,
   GeneratedChallenge,
   GeneratedDailyLesson,
   GeneratedGrammarExplanation,
@@ -9,9 +11,17 @@ import type {
   GeneratedVocabularyItem,
   LessonGenerationStatus
 } from "@/types";
+import { prisma } from "@/lib/db/prisma";
+import {
+  generatedLessonShellToDailyLesson,
+  getGeneratedCurriculumLesson,
+  getGeneratedCurriculumLessonByDayNumber
+} from "@/lib/curriculum/generated-curriculum";
 import { getDailyLessonByDayNumber } from "@/lib/curriculum/curriculum-map";
 import { dailyLessonGenerationPrompt } from "@/lib/prompts/daily-lesson-generation-prompt";
 import {
+  buildSourceSnippet,
+  formatCitation,
   getSourceLibraryStats,
   retrieveSpanishSources,
   type RankedSpanishSource,
@@ -84,7 +94,10 @@ type RawChallenge = {
 };
 
 export async function generateDailyLesson(dayNumber: number): Promise<DailyLessonGenerationResult> {
-  const lesson = getDailyLessonByDayNumber(dayNumber);
+  const generatedShell = await getGeneratedCurriculumLessonByDayNumber(dayNumber);
+  const lesson = generatedShell
+    ? generatedLessonShellToDailyLesson(generatedShell)
+    : getDailyLessonByDayNumber(dayNumber);
 
   if (!lesson) {
     return {
@@ -92,6 +105,32 @@ export async function generateDailyLesson(dayNumber: number): Promise<DailyLesso
       generatedLesson: buildMissingLesson(dayNumber, "Lesson metadata was not found.")
     };
   }
+
+  return generateLessonForContext(lesson, generatedShell);
+}
+
+export async function generateDailyLessonByLessonId(
+  lessonId: string
+): Promise<DailyLessonGenerationResult> {
+  const generatedShell = await getGeneratedCurriculumLesson(lessonId);
+
+  if (!generatedShell) {
+    return {
+      lesson: null,
+      generatedLesson: buildMissingLesson(0, "Generated lesson metadata was not found.")
+    };
+  }
+
+  return generateLessonForContext(
+    generatedLessonShellToDailyLesson(generatedShell),
+    generatedShell
+  );
+}
+
+async function generateLessonForContext(
+  lesson: DailyLesson,
+  generatedShell: GeneratedCurriculumLessonShell | null
+): Promise<DailyLessonGenerationResult> {
 
   const generatedAt = new Date().toISOString();
   const stats = await getSourceLibraryStats();
@@ -113,12 +152,7 @@ export async function generateDailyLesson(dayNumber: number): Promise<DailyLesso
     };
   }
 
-  const retrieval = await retrieveSpanishSources(buildLessonRetrievalQuery(lesson), {
-    maxSources: 8,
-    candidateLimit: 120,
-    semanticCandidateLimit: 900,
-    maxChunksPerPage: 1
-  }).catch(() => null);
+  const retrieval = await retrieveLessonSources(lesson, generatedShell).catch(() => null);
 
   if (!retrieval || retrieval.sources.length === 0) {
     return {
@@ -157,7 +191,7 @@ export async function generateDailyLesson(dayNumber: number): Promise<DailyLesso
     const response = await client.responses.create({
       model: getOpenAIModel(),
       instructions: dailyLessonGenerationPrompt,
-      input: buildOpenAIInput(lesson, retrieval.sources),
+      input: buildOpenAIInput(lesson, retrieval.sources, generatedShell),
       max_output_tokens: 1900
     });
     const parsed = parseGeneratedLessonJson(response.output_text ?? "");
@@ -203,6 +237,105 @@ export async function generateDailyLesson(dayNumber: number): Promise<DailyLesso
   }
 }
 
+async function retrieveLessonSources(
+  lesson: DailyLesson,
+  generatedShell: GeneratedCurriculumLessonShell | null
+) {
+  if (generatedShell) {
+    const directSources = await retrieveGeneratedLessonSources(generatedShell);
+
+    if (directSources.sources.length > 0) {
+      return directSources;
+    }
+  }
+
+  return retrieveSpanishSources(generatedShell?.retrievalQuery ?? buildLessonRetrievalQuery(lesson), {
+    maxSources: 8,
+    candidateLimit: 120,
+    semanticCandidateLimit: 900,
+    maxChunksPerPage: 1
+  });
+}
+
+async function retrieveGeneratedLessonSources(shell: GeneratedCurriculumLessonShell) {
+  const sourceReferences = normalizeSourceReferences(shell.sourceReferences);
+
+  if (sourceReferences.length === 0) {
+    return {
+      sources: [],
+      retrievalMode: "none" as RetrievalMode,
+      semanticCandidateCount: 0,
+      keywordCandidateCount: 0
+    };
+  }
+
+  const chunkIds = sourceReferences
+    .map((reference) => reference.chunkId)
+    .filter((chunkId): chunkId is string => Boolean(chunkId));
+  const pageSelectors = sourceReferences.map((reference) => ({
+    documentId: reference.documentId,
+    pageNumber: reference.pageNumber
+  }));
+  const chunks = await prisma.spanishSourceChunk.findMany({
+    where: {
+      OR: [
+        ...chunkIds.map((id) => ({ id })),
+        ...pageSelectors.map((selector) => ({
+          documentId: selector.documentId,
+          pageNumber: selector.pageNumber
+        }))
+      ]
+    },
+    include: {
+      document: true
+    },
+    orderBy: [
+      {
+        pageNumber: "asc"
+      },
+      {
+        chunkIndex: "asc"
+      }
+    ],
+    take: 8
+  });
+  const sources = chunks.map((chunk, index) => {
+    const citation = {
+      sourceFileName: chunk.document.originalFileName,
+      pageNumber: chunk.pageNumber,
+      snippet: buildSourceSnippet(chunk.text, shell.retrievalQuery)
+    };
+    const citationLabel = formatCitation(citation);
+
+    return {
+      documentId: chunk.documentId,
+      pageId: chunk.pageId,
+      chunkId: chunk.id,
+      fileName: chunk.document.fileName,
+      originalFileName: chunk.document.originalFileName,
+      pageNumber: chunk.pageNumber,
+      chunkIndex: chunk.chunkIndex,
+      text: chunk.text,
+      characterCount: chunk.characterCount,
+      citation,
+      citationLabel,
+      preview: citation.snippet ?? "",
+      relevanceScore: 1 - index * 0.01,
+      semanticScore: 0,
+      keywordScore: 100 - index,
+      combinedScore: 1 - index * 0.01,
+      matchedTerms: []
+    } satisfies RankedSpanishSource;
+  });
+
+  return {
+    sources,
+    retrievalMode: sources.length > 0 ? ("keyword" as RetrievalMode) : ("none" as RetrievalMode),
+    semanticCandidateCount: 0,
+    keywordCandidateCount: sources.length
+  };
+}
+
 export function buildGeneratedLessonCitations(
   sources: RankedSpanishSource[]
 ): GeneratedLessonCitation[] {
@@ -221,6 +354,16 @@ export function buildGeneratedLessonCitations(
   }
 
   return Array.from(citations.values());
+}
+
+function normalizeSourceReferences(references: CurriculumSourceReference[]) {
+  const byPage = new Map<string, CurriculumSourceReference>();
+
+  for (const reference of references) {
+    byPage.set(`${reference.documentId}:${reference.pageNumber}:${reference.chunkId ?? "page"}`, reference);
+  }
+
+  return Array.from(byPage.values());
 }
 
 function buildMissingLesson(dayNumber: number, warning: string): GeneratedDailyLesson {
@@ -537,8 +680,21 @@ function buildLessonRetrievalQuery(lesson: DailyLesson) {
   ].join(" ");
 }
 
-function buildOpenAIInput(lesson: DailyLesson, sources: RankedSpanishSource[]) {
+function buildOpenAIInput(
+  lesson: DailyLesson,
+  sources: RankedSpanishSource[],
+  generatedShell: GeneratedCurriculumLessonShell | null
+) {
   const allowedCitations = sources.map((source) => source.citationLabel).join("; ");
+  const generatedShellContext = generatedShell
+    ? `
+Generated curriculum shell:
+- Lesson ID: ${generatedShell.lessonId}
+- Source page window: ${generatedShell.sourcePageStart ?? "unknown"} to ${generatedShell.sourcePageEnd ?? "unknown"}
+- Retrieval query: ${generatedShell.retrievalQuery}
+- Source references: ${generatedShell.sourceReferences.map((reference) => reference.citationLabel).join("; ")}
+`
+    : "";
   const sourceContext = sources
     .slice(0, 8)
     .map(
@@ -562,6 +718,8 @@ Lesson metadata:
 - Family communication goal: ${lesson.familyCommunicationGoal}
 - Builds on previous lessons: ${lesson.buildsOn.length > 0 ? lesson.buildsOn.join(", ") : "none"}
 - Mastery goals: ${lesson.masteryGoals.join("; ")}
+
+${generatedShellContext}
 
 Allowed citation labels:
 ${allowedCitations}

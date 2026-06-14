@@ -240,3 +240,118 @@ export type GeneratedDailyLesson = {
   missingSourceWarning?: string;
   error?: string;
 };
+
+export type CurriculumGenerationStatus =
+  | "seed"
+  | "pdf_derived"
+  | "mixed_fallback"
+  | "no_sources"
+  | "generating"
+  | "failed";
+
+export type CurriculumSourceReference = {
+  fileName: string;
+  documentId: string;
+  pageNumber: number;
+  pageId?: string;
+  chunkId?: string;
+  citationLabel: string;
+  snippet?: string;
+};
+
+export type GeneratedCurriculumLessonShell = {
+  id: string;
+  lessonId: string;
+  dayNumber: number;
+  weekNumber: number;
+  dayInWeek: number;
+  sectionTitle: string;
+  title: string;
+  grammarFocus: string;
+  vocabularyFocus: string;
+  estimatedMinutes: 20;
+  sourceDocumentIds: string[];
+  sourcePageStart?: number;
+  sourcePageEnd?: number;
+  sourceReferences: CurriculumSourceReference[];
+  retrievalQuery: string;
+  buildsOnLessonIds: string[];
+  masteryGoals: string[];
+  contentGenerated: boolean;
+  generatedContentId?: string;
+};
+
+export type GeneratedCurriculumWeek = {
+  weekNumber: number;
+  title: string;
+  sectionTitle: string;
+  lessons: GeneratedCurriculumLessonShell[];
+  reviewTitle: string;
+  assessmentTitle: string;
+  sourceReferences: CurriculumSourceReference[];
+};
+
+export type GeneratedCurriculumSection = {
+  id: string;
+  sectionIndex: number;
+  title: string;
+  description: string;
+  sourceDocumentIds: string[];
+  sourcePageStart?: number;
+  sourcePageEnd?: number;
+  weekStart: number;
+  weekEnd: number;
+  lessonCount: number;
+  sourceReferences: CurriculumSourceReference[];
+  weeks: GeneratedCurriculumWeek[];
+};
+
+export type GeneratedCurriculum = {
+  id: string;
+  title: string;
+  status: CurriculumGenerationStatus;
+  sourceDocumentCount: number;
+  sourcePageCount: number;
+  sourceChunkCount: number;
+  sectionCount: number;
+  weekCount: number;
+  lessonCount: number;
+  sourceCoverage: CurriculumSourceReference[];
+  generatedAt: string;
+  updatedAt: string;
+  sections: GeneratedCurriculumSection[];
+  lessons: GeneratedCurriculumLessonShell[];
+};
+
+export type CurriculumGenerationRun = {
+  id: string;
+  curriculumId?: string;
+  status: CurriculumGenerationStatus;
+  message: string;
+  dryRun: boolean;
+  usedOpenAI: boolean;
+  sourceDocumentCount: number;
+  sourcePageCount: number;
+  sourceChunkCount: number;
+  generatedSectionCount: number;
+  generatedWeekCount: number;
+  generatedLessonCount: number;
+  sourceCoverage: CurriculumSourceReference[];
+  startedAt: string;
+  completedAt?: string;
+};
+
+export type GeneratedCurriculumStatusSummary = {
+  sourceDocumentCount: number;
+  sourcePageCount: number;
+  sourceChunkCount: number;
+  sourcePdfsAvailable: boolean;
+  generatedCurriculumExists: boolean;
+  curriculumMode: "seed" | "pdf_derived" | "mixed_fallback";
+  generatedLessonCount: number;
+  generatedWeekCount: number;
+  generatedSectionCount: number;
+  lastGeneratedAt?: string;
+  lastRun?: CurriculumGenerationRun;
+  message: string;
+};

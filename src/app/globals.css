@@ -1018,11 +1018,53 @@ p {
   gap: 16px;
 }
 
+.curriculum-control-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(220px, 0.45fr);
+  gap: 16px;
+  align-items: center;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: rgba(18, 21, 31, 0.88);
+  box-shadow: var(--shadow);
+  padding: 20px;
+}
+
+.curriculum-control-panel h2 {
+  margin: 10px 0 8px;
+  font-size: 1.18rem;
+}
+
+.curriculum-control-panel p,
+.curriculum-control-note span {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.curriculum-control-actions,
+.curriculum-control-note {
+  display: grid;
+  gap: 10px;
+}
+
+.curriculum-control-note {
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.025);
+  padding: 12px;
+}
+
+.curriculum-control-note strong {
+  color: var(--text);
+  line-height: 1.4;
+}
+
 .curriculum-summary-grid,
 .practice-mode-grid,
 .helper-card-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 16px;
 }
@@ -1370,6 +1412,7 @@ p {
   .source-toolbar,
   .detail-grid,
   .chat-evidence-grid,
+  .curriculum-control-panel,
   .week-grid,
   .generated-lesson-grid,
   .lesson-detail-layout,
