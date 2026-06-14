@@ -33,6 +33,10 @@ export default async function SettingsPage() {
   const sections = generatedCurriculum
     ? generatedCurriculumToSections(generatedCurriculum)
     : getCurriculumSections();
+  const classificationRows = Object.entries(curriculumStatus.classificationSummary)
+    .filter(([, bucket]) => bucket.total > 0)
+    .sort(([, left], [, right]) => right.total - left.total)
+    .slice(0, 6);
 
   return (
     <div className="page">
@@ -45,6 +49,7 @@ export default async function SettingsPage() {
           { label: stats.databaseConnected ? "Database connected" : "Database missing", tone: stats.databaseConnected ? "green" : "rose" },
           { label: embeddingStatus.semanticRetrievalReady ? "Local semantic scoring ready" : "Keyword fallback", tone: embeddingStatus.semanticRetrievalReady ? "green" : "gold" },
           { label: generatedCurriculum ? "PDF-derived curriculum" : "Seed fallback", tone: generatedCurriculum ? "green" : "gold" },
+          { label: curriculumStatus.curriculumBuiltWithPageFiltering ? "Page filtering active" : "Page filtering preview", tone: curriculumStatus.curriculumBuiltWithPageFiltering ? "green" : "gold" },
           { label: chatReady ? "Chat ready" : "Chat not ready", tone: chatReady ? "green" : "gold" }
         ]}
       />
@@ -106,6 +111,14 @@ export default async function SettingsPage() {
               <span>{curriculumStatus.message}</span>
             </div>
             <div className="timeline-item">
+              <strong>PDF page filter</strong>
+              <span>
+                {curriculumStatus.totalSourcePages} source pages scanned;{" "}
+                {curriculumStatus.instructionalPagesIncluded} instructional pages included;{" "}
+                {curriculumStatus.nonInstructionalPagesExcluded} non-instructional pages excluded.
+              </span>
+            </div>
+            <div className="timeline-item">
               <strong>Chat</strong>
               <span>{chatReady ? "Ready for PDF-grounded tutor answers" : "Needs OpenAI key and chunks"}</span>
             </div>
@@ -137,22 +150,38 @@ export default async function SettingsPage() {
       <section className="detail-grid section-offset" aria-label="Curriculum settings">
         <CurriculumStatusPanel sections={sections} />
         <aside className="placeholder-panel">
-          <span className="badge teal">Progress storage</span>
+          <span className="badge teal">Curriculum filtering</span>
           <h2>Local-first curriculum state</h2>
           <p>
             Daily lesson completion, review completion, and placeholder assessment attempts
             are stored in browser localStorage for this MVP. Generated curriculum shells are
-            stored in SQLite, but full daily lesson content is still generated on demand only
-            after source retrieval.
+            stored in SQLite after a deterministic page filter removes front matter, tables of
+            contents, licenses, answer keys, appendices, indexes, and glossaries. Full daily
+            lesson content is still generated on demand only after source retrieval.
           </p>
           <div className="stack">
             <span className="code-pill">localStorage curriculum progress</span>
             <span className="code-pill">{curriculumStatus.curriculumMode}</span>
+            <span className="code-pill">{curriculumStatus.lastGenerationMode ?? "unfiltered"}</span>
             <span className="code-pill">{curriculumStatus.generatedLessonCount} generated lesson shells</span>
+            <span className="code-pill">{curriculumStatus.instructionalPagesIncluded} instructional pages included</span>
+            <span className="code-pill">{curriculumStatus.nonInstructionalPagesExcluded} non-instructional pages excluded</span>
             <span className="code-pill">PDF-only lesson content</span>
+            {classificationRows.map(([classification, bucket]) => (
+              <span className="code-pill" key={classification}>
+                {formatClassificationLabel(classification)}: {bucket.included}/{bucket.total} included
+              </span>
+            ))}
+            {curriculumStatus.filteringWarnings.slice(0, 3).map((warning) => (
+              <span className="code-pill" key={warning}>{warning}</span>
+            ))}
           </div>
         </aside>
       </section>
     </div>
   );
+}
+
+function formatClassificationLabel(value: string) {
+  return value.replace(/_/g, " ");
 }

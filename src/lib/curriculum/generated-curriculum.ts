@@ -1,8 +1,18 @@
 import { prisma } from "@/lib/db/prisma";
 import { buildSourceSnippet, formatCitation, getSourceLibraryStats } from "@/lib/sources";
+import {
+  CURRICULUM_PAGE_FILTER_VERSION,
+  INSTRUCTIONAL_PAGE_SCORE_THRESHOLD,
+  buildEmptyClassificationSummary,
+  classifyCurriculumPage
+} from "./page-classifier";
 import type {
+  CurriculumClassificationSummary,
+  CurriculumFilteringMetadata,
   CurriculumGenerationRun,
   CurriculumGenerationStatus,
+  CurriculumPageClassification,
+  CurriculumPageClassificationSample,
   CurriculumSection,
   CurriculumSourceReference,
   CurriculumWeek,
@@ -19,7 +29,7 @@ import type {
 } from "@/types";
 
 const LESSONS_PER_WEEK = 5;
-const PAGES_PER_LESSON = 2;
+const PAGES_PER_LESSON = 3;
 const CURRICULUM_TITLE = "PDF-derived Spanish curriculum";
 
 const GENERATED_LESSON_BLOCKS: LessonBlock[] = [
@@ -70,6 +80,7 @@ export type CurriculumGenerationResult = {
   generatedSectionCount: number;
   generatedWeekCount: number;
   generatedLessonCount: number;
+  filtering: CurriculumFilteringMetadata;
 };
 
 type SourceChunkForCurriculum = {
@@ -88,6 +99,17 @@ type SourcePageForCurriculum = {
   text: string;
   characterCount: number;
   chunks: SourceChunkForCurriculum[];
+};
+
+type ClassifiedSourcePageForCurriculum = SourcePageForCurriculum & {
+  classification: CurriculumPageClassification;
+  instructionalScore: number;
+  includedInCurriculum: boolean;
+  classificationReasons: string[];
+};
+
+type ClassifiedSourceDocumentForCurriculum = Omit<SourceDocumentForCurriculum, "pages"> & {
+  pages: ClassifiedSourcePageForCurriculum[];
 };
 
 type SourceDocumentForCurriculum = {
@@ -112,6 +134,13 @@ type CurriculumRecord = {
   sectionCount: number;
   weekCount: number;
   lessonCount: number;
+  filteringEnabled: boolean;
+  filteringVersion: string;
+  generationMode: string;
+  instructionalPageCount: number;
+  excludedPageCount: number;
+  classificationSummaryJson: string;
+  filteringSamplesJson: string;
   sourceCoverageJson: string;
   generatedAt: Date;
   updatedAt: Date;
@@ -168,9 +197,28 @@ type RunRecord = {
   generatedSectionCount: number;
   generatedWeekCount: number;
   generatedLessonCount: number;
+  filteringEnabled: boolean;
+  filteringVersion: string;
+  generationMode: string;
+  instructionalPageCount: number;
+  excludedPageCount: number;
+  classificationSummaryJson: string;
+  filteringSamplesJson: string;
   sourceCoverageJson: string;
   startedAt: Date;
   completedAt: Date | null;
+};
+
+type FilteringRecordFields = {
+  sourceDocumentCount: number;
+  sourcePageCount: number;
+  filteringEnabled: boolean;
+  filteringVersion: string;
+  generationMode: string;
+  instructionalPageCount: number;
+  excludedPageCount: number;
+  classificationSummaryJson: string;
+  filteringSamplesJson: string;
 };
 
 export async function getGeneratedCurriculumStatus(): Promise<GeneratedCurriculumStatusSummary> {
@@ -187,6 +235,7 @@ export async function getGeneratedCurriculumStatus(): Promise<GeneratedCurriculu
       : sourcePdfsAvailable
         ? "mixed_fallback"
         : "seed";
+    const activeFiltering = curriculum?.filtering ?? lastRun?.filtering ?? buildDefaultFilteringMetadata();
 
     return {
       sourceDocumentCount: stats.sourceDocumentCount,
@@ -198,11 +247,20 @@ export async function getGeneratedCurriculumStatus(): Promise<GeneratedCurriculu
       generatedLessonCount: curriculum?.lessonCount ?? 0,
       generatedWeekCount: curriculum?.weekCount ?? 0,
       generatedSectionCount: curriculum?.sectionCount ?? 0,
+      curriculumBuiltWithPageFiltering: Boolean(curriculum?.filtering.enabled),
+      totalSourcePages: stats.sourcePageCount,
+      instructionalPagesIncluded: activeFiltering.pagesIncluded,
+      nonInstructionalPagesExcluded: activeFiltering.pagesExcluded,
+      lastGenerationMode: activeFiltering.generationMode,
+      classificationSummary: activeFiltering.classificationSummary,
+      filteringWarnings: activeFiltering.warnings,
       lastGeneratedAt: curriculum?.generatedAt,
       lastRun: lastRun ?? undefined,
       message: buildStatusMessage(curriculumMode, stats.sourceChunkCount, lastRun?.message)
     };
   } catch {
+    const defaultFiltering = buildDefaultFilteringMetadata();
+
     return {
       sourceDocumentCount: stats.sourceDocumentCount,
       sourcePageCount: stats.sourcePageCount,
@@ -213,6 +271,13 @@ export async function getGeneratedCurriculumStatus(): Promise<GeneratedCurriculu
       generatedLessonCount: 0,
       generatedWeekCount: 0,
       generatedSectionCount: 0,
+      curriculumBuiltWithPageFiltering: false,
+      totalSourcePages: stats.sourcePageCount,
+      instructionalPagesIncluded: 0,
+      nonInstructionalPagesExcluded: 0,
+      lastGenerationMode: defaultFiltering.generationMode,
+      classificationSummary: defaultFiltering.classificationSummary,
+      filteringWarnings: defaultFiltering.warnings,
       message:
         "Generated curriculum tables are not ready yet. The fixed 8-week seed curriculum remains active as the safe fallback."
     };
@@ -304,6 +369,143 @@ export function generatedLessonShellToDailyLesson(shell: GeneratedCurriculumLess
   };
 }
 
+function buildInstructionalPageGroups(
+  pages: ClassifiedSourcePageForCurriculum[]
+): ClassifiedSourcePageForCurriculum[][] {
+  const groups: ClassifiedSourcePageForCurriculum[][] = [];
+  let current: ClassifiedSourcePageForCurriculum[] = [];
+
+  for (const page of pages) {
+    const previous = current[current.length - 1];
+    const startsNewBoundary = current.length > 0 && isInstructionalBoundary(page);
+    const breaksPageRun = previous ? page.pageNumber > previous.pageNumber + 1 : false;
+
+    if (current.length > 0 && (startsNewBoundary || breaksPageRun)) {
+      groups.push(current);
+      current = [];
+    }
+
+    current.push(page);
+
+    if (current.length >= getMaxPagesForGroup(current)) {
+      groups.push(current);
+      current = [];
+    }
+  }
+
+  if (current.length > 0) {
+    groups.push(current);
+  }
+
+  return groups;
+}
+
+function getMaxPagesForGroup(pages: ClassifiedSourcePageForCurriculum[]) {
+  return pages.some((page) => page.classification === "exercise" || page.classification === "review")
+    ? 2
+    : PAGES_PER_LESSON;
+}
+
+function isInstructionalBoundary(page: ClassifiedSourcePageForCurriculum) {
+  const text = normalizeCurriculumText(page.text || page.chunks.map((chunk) => chunk.text).join(" "));
+  const start = text.slice(0, 900);
+
+  return /\b(chapter|unit|lesson|section|capitulo|unidad|leccion)\s+\d+/i.test(start);
+}
+
+function getPrimaryClassification(pages: ClassifiedSourcePageForCurriculum[]) {
+  const priority: CurriculumPageClassification[] = [
+    "grammar",
+    "vocabulary",
+    "exercise",
+    "review",
+    "culture_or_reading",
+    "instructional"
+  ];
+
+  return (
+    priority.find((classification) => pages.some((page) => page.classification === classification)) ??
+    "instructional"
+  );
+}
+
+function extractInstructionalHeading(pages: ClassifiedSourcePageForCurriculum[]) {
+  for (const page of pages) {
+    const lines = (page.text || page.chunks.map((chunk) => chunk.text).join("\n"))
+      .split(/\n+/)
+      .map((line) => line.replace(/\s+/g, " ").trim())
+      .filter((line) => isUsableHeading(line));
+    const preferred = lines.find((line) =>
+      /\b(chapter|unit|lesson|section|capitulo|unidad|leccion|grammar|vocabulary|vocabulario|ejercicio|exercise|review|repaso)\b/i.test(line)
+    );
+
+    if (preferred) {
+      return truncateText(preferred, 90);
+    }
+
+    if (lines[0]) {
+      return truncateText(lines[0], 90);
+    }
+  }
+
+  return undefined;
+}
+
+function isUsableHeading(line: string) {
+  if (line.length < 6 || line.length > 120) {
+    return false;
+  }
+
+  if (/https?:\/\//i.test(line) || /copyright|creative commons|license|isbn|answer key|contents/i.test(line)) {
+    return false;
+  }
+
+  if (/^[\d\W]+$/.test(line)) {
+    return false;
+  }
+
+  return true;
+}
+
+function buildLessonShellTitle(
+  classification: CurriculumPageClassification,
+  heading: string | undefined,
+  pageRange: string
+) {
+  const prefix = {
+    grammar: "Grammar",
+    vocabulary: "Vocabulary",
+    exercise: "Practice",
+    review: "Review",
+    culture_or_reading: "Culture/reading",
+    instructional: "Instructional",
+    front_matter: "Instructional",
+    table_of_contents: "Instructional",
+    license_or_credits: "Instructional",
+    answer_key: "Instructional",
+    appendix: "Instructional",
+    index_or_glossary: "Instructional",
+    bibliography: "Instructional",
+    unknown: "Instructional"
+  }[classification];
+
+  return heading ? `${prefix}: ${heading} (${pageRange})` : `${prefix} lesson from ${pageRange}`;
+}
+
+function buildLessonFocus(
+  focusType: "grammar" | "vocabulary",
+  classification: CurriculumPageClassification,
+  heading: string | undefined,
+  fileName: string,
+  pageRange: string
+) {
+  const label = focusType === "grammar" ? "grammar" : "vocabulary";
+  const classificationText = classification.replace(/_/g, " ");
+  const headingText = heading ? `: ${heading}` : "";
+
+  return `PDF-supported ${label} focus from ${fileName}, ${pageRange} (${classificationText})${headingText}`;
+}
+
 export async function generatePdfDerivedCurriculum(
   options: CurriculumGenerationOptions = {}
 ): Promise<CurriculumGenerationResult> {
@@ -313,6 +515,14 @@ export async function generatePdfDerivedCurriculum(
   const availableDocuments = documents.filter((document) =>
     document.pages.some((page) => page.chunks.length > 0)
   );
+  const classifiedDocuments = classifyDocumentsForCurriculum(availableDocuments);
+  const filtering = buildFilteringMetadata(classifiedDocuments);
+  const filteredDocuments = classifiedDocuments
+    .map((document) => ({
+      ...document,
+      pages: document.pages.filter((page) => page.includedInCurriculum)
+    }))
+    .filter((document) => document.pages.length > 0);
   const sourceDocumentCount = availableDocuments.length;
   const sourcePageCount = availableDocuments.reduce(
     (total, document) => total + document.pages.filter((page) => page.chunks.length > 0).length,
@@ -337,6 +547,7 @@ export async function generatePdfDerivedCurriculum(
       generatedSectionCount: 0,
       generatedWeekCount: 0,
       generatedLessonCount: 0,
+      filtering,
       sourceCoverage: []
     });
 
@@ -351,14 +562,49 @@ export async function generatePdfDerivedCurriculum(
       sourceChunkCount,
       generatedSectionCount: 0,
       generatedWeekCount: 0,
-      generatedLessonCount: 0
+      generatedLessonCount: 0,
+      filtering
     });
   }
 
-  const draft = buildCurriculumDraft(availableDocuments);
+  if (filtering.pagesIncluded === 0) {
+    const message =
+      "PDF chunks exist, but the page filter did not find instructional pages eligible for curriculum shells. Review classification settings or imported sources.";
+    const run = await maybePersistRun({
+      dryRun,
+      startedAt,
+      status: "no_sources",
+      message,
+      sourceDocumentCount,
+      sourcePageCount,
+      sourceChunkCount,
+      generatedSectionCount: 0,
+      generatedWeekCount: 0,
+      generatedLessonCount: 0,
+      filtering,
+      sourceCoverage: []
+    });
+
+    return buildGenerationResult({
+      status: "no_sources",
+      message,
+      dryRun,
+      curriculum: null,
+      run,
+      sourceDocumentCount,
+      sourcePageCount,
+      sourceChunkCount,
+      generatedSectionCount: 0,
+      generatedWeekCount: 0,
+      generatedLessonCount: 0,
+      filtering
+    });
+  }
+
+  const draft = buildCurriculumDraft(filteredDocuments, filtering);
   const message = dryRun
-    ? `Dry run only: ${draft.lessonCount} lesson shells would be generated from ${sourceDocumentCount} imported PDF document(s). No database writes or OpenAI calls were made.`
-    : `Generated ${draft.lessonCount} lesson shells from imported PDF pages. Full lesson content remains on-demand and source-cited.`;
+    ? `Dry run only: ${draft.lessonCount} lesson shells would be generated from ${filtering.pagesIncluded} filtered instructional pages. ${filtering.pagesExcluded} non-instructional pages would be excluded. No database writes or OpenAI calls were made.`
+    : `Generated ${draft.lessonCount} lesson shells from ${filtering.pagesIncluded} filtered instructional pages. ${filtering.pagesExcluded} non-instructional pages were excluded. Full lesson content remains on-demand and source-cited.`;
   const runDraft = buildRun({
     id: "dry-run",
     curriculumId: dryRun ? undefined : draft.id,
@@ -372,6 +618,7 @@ export async function generatePdfDerivedCurriculum(
     generatedSectionCount: draft.sectionCount,
     generatedWeekCount: draft.weekCount,
     generatedLessonCount: draft.lessonCount,
+    filtering,
     sourceCoverage: draft.sourceCoverage
   });
 
@@ -387,7 +634,8 @@ export async function generatePdfDerivedCurriculum(
       sourceChunkCount,
       generatedSectionCount: draft.sectionCount,
       generatedWeekCount: draft.weekCount,
-      generatedLessonCount: draft.lessonCount
+      generatedLessonCount: draft.lessonCount,
+      filtering
     });
   }
 
@@ -404,6 +652,13 @@ export async function generatePdfDerivedCurriculum(
         sectionCount: draft.sectionCount,
         weekCount: draft.weekCount,
         lessonCount: draft.lessonCount,
+        filteringEnabled: draft.filtering.enabled,
+        filteringVersion: draft.filtering.version,
+        generationMode: draft.filtering.generationMode,
+        instructionalPageCount: draft.filtering.pagesIncluded,
+        excludedPageCount: draft.filtering.pagesExcluded,
+        classificationSummaryJson: stringifyJson(draft.filtering.classificationSummary),
+        filteringSamplesJson: stringifyJson(buildFilteringSamplesPayload(draft.filtering)),
         sourceCoverageJson: stringifyJson(draft.sourceCoverage)
       }
     });
@@ -475,6 +730,13 @@ export async function generatePdfDerivedCurriculum(
         generatedSectionCount: draft.sectionCount,
         generatedWeekCount: draft.weekCount,
         generatedLessonCount: draft.lessonCount,
+        filteringEnabled: draft.filtering.enabled,
+        filteringVersion: draft.filtering.version,
+        generationMode: draft.filtering.generationMode,
+        instructionalPageCount: draft.filtering.pagesIncluded,
+        excludedPageCount: draft.filtering.pagesExcluded,
+        classificationSummaryJson: stringifyJson(draft.filtering.classificationSummary),
+        filteringSamplesJson: stringifyJson(buildFilteringSamplesPayload(draft.filtering)),
         sourceCoverageJson: stringifyJson(draft.sourceCoverage),
         startedAt,
         completedAt: new Date()
@@ -515,11 +777,15 @@ export async function generatePdfDerivedCurriculum(
     sourceChunkCount,
     generatedSectionCount: curriculum.sectionCount,
     generatedWeekCount: curriculum.weekCount,
-    generatedLessonCount: curriculum.lessonCount
+    generatedLessonCount: curriculum.lessonCount,
+    filtering: curriculum.filtering
   });
 }
 
-function buildCurriculumDraft(documents: SourceDocumentForCurriculum[]): GeneratedCurriculum {
+function buildCurriculumDraft(
+  documents: ClassifiedSourceDocumentForCurriculum[],
+  filtering: CurriculumFilteringMetadata
+): GeneratedCurriculum {
   const generatedAt = new Date().toISOString();
   const lessons: GeneratedCurriculumLessonShell[] = [];
   const sections: GeneratedCurriculumSection[] = [];
@@ -527,11 +793,12 @@ function buildCurriculumDraft(documents: SourceDocumentForCurriculum[]): Generat
   let previousLessonId: string | null = null;
 
   documents.forEach((document, documentIndex) => {
-    const pages = document.pages.filter((page) => page.chunks.length > 0);
+    const pages = document.pages.filter((page) => page.chunks.length > 0 && page.includedInCurriculum);
     const sectionLessons: GeneratedCurriculumLessonShell[] = [];
     const sectionTitle = buildSectionTitle(document.originalFileName, documentIndex + 1);
     const sectionStartPage = pages[0]?.pageNumber;
     const sectionEndPage = pages[pages.length - 1]?.pageNumber;
+    const pageGroups = buildInstructionalPageGroups(pages);
 
     if (pages[0]) {
       const firstReference = buildReference(document, pages[0]);
@@ -541,8 +808,7 @@ function buildCurriculumDraft(documents: SourceDocumentForCurriculum[]): Generat
       }
     }
 
-    for (let pageIndex = 0; pageIndex < pages.length; pageIndex += PAGES_PER_LESSON) {
-      const pageWindow = pages.slice(pageIndex, pageIndex + PAGES_PER_LESSON);
+    for (const pageWindow of pageGroups) {
       const firstPage = pageWindow[0];
       const lastPage = pageWindow[pageWindow.length - 1];
 
@@ -555,6 +821,8 @@ function buildCurriculumDraft(documents: SourceDocumentForCurriculum[]): Generat
       const dayInWeek = ((dayNumber - 1) % LESSONS_PER_WEEK) + 1;
       const pageRange = formatPageRange(firstPage.pageNumber, lastPage.pageNumber);
       const lessonId = `pdf-${slugify(document.id)}-p${firstPage.pageNumber}-${lastPage.pageNumber}-d${dayNumber}`;
+      const heading = extractInstructionalHeading(pageWindow);
+      const primaryClassification = getPrimaryClassification(pageWindow);
       const sourceReferences = pageWindow
         .map((page) => buildReference(document, page))
         .filter((reference): reference is CurriculumSourceReference => Boolean(reference));
@@ -565,15 +833,23 @@ function buildCurriculumDraft(documents: SourceDocumentForCurriculum[]): Generat
         weekNumber,
         dayInWeek,
         sectionTitle,
-        title: `Source-supported lesson from ${pageRange}`,
-        grammarFocus: `PDF-supported grammar focus from ${document.originalFileName}, ${pageRange}`,
-        vocabularyFocus: `Everyday vocabulary supported by ${document.originalFileName}, ${pageRange}`,
+        title: buildLessonShellTitle(primaryClassification, heading, pageRange),
+        grammarFocus: buildLessonFocus("grammar", primaryClassification, heading, document.originalFileName, pageRange),
+        vocabularyFocus: buildLessonFocus("vocabulary", primaryClassification, heading, document.originalFileName, pageRange),
         estimatedMinutes: 20,
         sourceDocumentIds: [document.id],
         sourcePageStart: firstPage.pageNumber,
         sourcePageEnd: lastPage.pageNumber,
         sourceReferences,
-        retrievalQuery: [document.originalFileName, pageRange, sectionTitle, `week ${weekNumber}`, `day ${dayNumber}`]
+        retrievalQuery: [
+          document.originalFileName,
+          pageRange,
+          heading,
+          primaryClassification,
+          sectionTitle,
+          `week ${weekNumber}`,
+          `day ${dayNumber}`
+        ]
           .join(" ")
           .trim(),
         buildsOnLessonIds: previousLessonId ? [previousLessonId] : [],
@@ -603,7 +879,7 @@ function buildCurriculumDraft(documents: SourceDocumentForCurriculum[]): Generat
       sectionIndex: documentIndex + 1,
       title: sectionTitle,
       description:
-        "Generated from imported PDF page ranges. Lesson shells point to citations; full lesson content is generated later on demand.",
+        "Generated from filtered instructional PDF page ranges. Front matter, licenses, answer keys, indexes, and other non-instructional pages are excluded before lesson shells are created.",
       sourceDocumentIds: [document.id],
       sourcePageStart: sectionStartPage,
       sourcePageEnd: sectionEndPage,
@@ -623,11 +899,12 @@ function buildCurriculumDraft(documents: SourceDocumentForCurriculum[]): Generat
     title: CURRICULUM_TITLE,
     status: "pdf_derived",
     sourceDocumentCount: documents.length,
-    sourcePageCount: documents.reduce((total, document) => total + document.pages.length, 0),
+    sourcePageCount: filtering.pagesScanned,
     sourceChunkCount: documents.reduce((total, document) => total + document._count.chunks, 0),
     sectionCount,
     weekCount,
     lessonCount: lessons.length,
+    filtering,
     sourceCoverage: uniqueReferences(sourceCoverage),
     generatedAt,
     updatedAt: generatedAt,
@@ -770,6 +1047,236 @@ async function getDocumentsForCurriculum(): Promise<SourceDocumentForCurriculum[
   }));
 }
 
+function classifyDocumentsForCurriculum(
+  documents: SourceDocumentForCurriculum[]
+): ClassifiedSourceDocumentForCurriculum[] {
+  return documents.map((document) => ({
+    ...document,
+    pages: document.pages.map((page) => {
+      const result = classifyCurriculumPage({
+        fileName: document.originalFileName,
+        pageNumber: page.pageNumber,
+        text: page.text,
+        chunks: page.chunks
+      });
+
+      return {
+        ...page,
+        classification: result.classification,
+        instructionalScore: result.score,
+        includedInCurriculum: result.included,
+        classificationReasons: result.reasons
+      };
+    })
+  }));
+}
+
+function buildFilteringMetadata(
+  documents: ClassifiedSourceDocumentForCurriculum[]
+): CurriculumFilteringMetadata {
+  const classificationSummary = buildEmptyClassificationSummary();
+  const includedSamples: CurriculumPageClassificationSample[] = [];
+  const excludedSamples: CurriculumPageClassificationSample[] = [];
+  let pagesScanned = 0;
+  let pagesIncluded = 0;
+  let pagesExcluded = 0;
+
+  for (const document of documents) {
+    for (const page of document.pages.filter((candidate) => candidate.chunks.length > 0)) {
+      const bucket = classificationSummary[page.classification];
+      const sample = buildClassificationSample(document, page);
+
+      pagesScanned += 1;
+      bucket.total += 1;
+
+      if (page.includedInCurriculum) {
+        pagesIncluded += 1;
+        bucket.included += 1;
+
+        if (includedSamples.length < 8) {
+          includedSamples.push(sample);
+        }
+      } else {
+        pagesExcluded += 1;
+        bucket.excluded += 1;
+
+        if (shouldKeepExcludedSample(sample, excludedSamples)) {
+          excludedSamples.push(sample);
+        }
+      }
+    }
+  }
+
+  return {
+    enabled: true,
+    version: CURRICULUM_PAGE_FILTER_VERSION,
+    generationMode: "filtered_instructional_pages",
+    threshold: INSTRUCTIONAL_PAGE_SCORE_THRESHOLD,
+    sourceDocumentsScanned: documents.length,
+    pagesScanned,
+    pagesIncluded,
+    pagesExcluded,
+    classificationSummary,
+    sampleIncludedPages: includedSamples,
+    sampleExcludedPages: excludedSamples.slice(0, 12),
+    warnings: buildFilteringWarnings(classificationSummary, pagesIncluded, pagesExcluded)
+  };
+}
+
+function buildClassificationSample(
+  document: ClassifiedSourceDocumentForCurriculum,
+  page: ClassifiedSourcePageForCurriculum
+): CurriculumPageClassificationSample {
+  const citationLabel = formatCitation({
+    sourceFileName: document.originalFileName,
+    pageNumber: page.pageNumber
+  });
+
+  return {
+    fileName: document.originalFileName,
+    documentId: document.id,
+    pageId: page.id,
+    pageNumber: page.pageNumber,
+    classification: page.classification,
+    score: page.instructionalScore,
+    included: page.includedInCurriculum,
+    reasons: page.classificationReasons,
+    citationLabel
+  };
+}
+
+function shouldKeepExcludedSample(
+  sample: CurriculumPageClassificationSample,
+  existing: CurriculumPageClassificationSample[]
+) {
+  if (existing.length < 4) {
+    return true;
+  }
+
+  return !existing.some((candidate) => candidate.classification === sample.classification);
+}
+
+function buildFilteringWarnings(
+  summary: CurriculumClassificationSummary,
+  pagesIncluded: number,
+  pagesExcluded: number
+) {
+  const warnings: string[] = [];
+
+  if (pagesExcluded > 0) {
+    warnings.push(`${pagesExcluded} non-instructional page(s) were excluded before shell generation.`);
+  }
+
+  for (const classification of [
+    "front_matter",
+    "table_of_contents",
+    "license_or_credits",
+    "answer_key",
+    "appendix",
+    "index_or_glossary",
+    "bibliography"
+  ] as CurriculumPageClassification[]) {
+    const count = summary[classification].excluded;
+
+    if (count > 0) {
+      warnings.push(`${count} ${classification.replace(/_/g, " ")} page(s) excluded.`);
+    }
+  }
+
+  if (pagesIncluded === 0) {
+    warnings.push("No instructional pages met the filtering threshold.");
+  }
+
+  return warnings.slice(0, 8);
+}
+
+function buildFilteringSamplesPayload(filtering: CurriculumFilteringMetadata) {
+  return {
+    threshold: filtering.threshold,
+    sourceDocumentsScanned: filtering.sourceDocumentsScanned,
+    pagesScanned: filtering.pagesScanned,
+    sampleIncludedPages: filtering.sampleIncludedPages,
+    sampleExcludedPages: filtering.sampleExcludedPages,
+    warnings: filtering.warnings
+  };
+}
+
+function buildDefaultFilteringMetadata(): CurriculumFilteringMetadata {
+  return {
+    enabled: false,
+    version: "none",
+    generationMode: "unfiltered",
+    threshold: INSTRUCTIONAL_PAGE_SCORE_THRESHOLD,
+    sourceDocumentsScanned: 0,
+    pagesScanned: 0,
+    pagesIncluded: 0,
+    pagesExcluded: 0,
+    classificationSummary: buildEmptyClassificationSummary(),
+    sampleIncludedPages: [],
+    sampleExcludedPages: [],
+    warnings: []
+  };
+}
+
+function filteringFromRecord(record: FilteringRecordFields): CurriculumFilteringMetadata {
+  const samplesPayload = parseJson<{
+    threshold?: number;
+    sourceDocumentsScanned?: number;
+    pagesScanned?: number;
+    sampleIncludedPages?: CurriculumPageClassificationSample[];
+    sampleExcludedPages?: CurriculumPageClassificationSample[];
+    warnings?: string[];
+  }>(record.filteringSamplesJson, {});
+  const enabled = Boolean(record.filteringEnabled);
+
+  return {
+    enabled,
+    version: record.filteringVersion || (enabled ? CURRICULUM_PAGE_FILTER_VERSION : "none"),
+    generationMode:
+      record.generationMode === "filtered_instructional_pages"
+        ? "filtered_instructional_pages"
+        : "unfiltered",
+    threshold: numberOr(samplesPayload.threshold, INSTRUCTIONAL_PAGE_SCORE_THRESHOLD),
+    sourceDocumentsScanned: numberOr(samplesPayload.sourceDocumentsScanned, record.sourceDocumentCount),
+    pagesScanned: numberOr(samplesPayload.pagesScanned, record.sourcePageCount),
+    pagesIncluded: record.instructionalPageCount,
+    pagesExcluded: record.excludedPageCount,
+    classificationSummary: parseClassificationSummary(record.classificationSummaryJson),
+    sampleIncludedPages: Array.isArray(samplesPayload.sampleIncludedPages)
+      ? samplesPayload.sampleIncludedPages
+      : [],
+    sampleExcludedPages: Array.isArray(samplesPayload.sampleExcludedPages)
+      ? samplesPayload.sampleExcludedPages
+      : [],
+    warnings: Array.isArray(samplesPayload.warnings) ? samplesPayload.warnings : []
+  };
+}
+
+function parseClassificationSummary(value: string): CurriculumClassificationSummary {
+  const parsed = parseJson<Partial<CurriculumClassificationSummary>>(value, {});
+  const summary = buildEmptyClassificationSummary();
+
+  for (const classification of Object.keys(summary) as CurriculumPageClassification[]) {
+    const bucket = parsed[classification];
+
+    if (!bucket) {
+      continue;
+    }
+
+    summary[classification] = {
+      total: numberOr(bucket.total, 0),
+      included: numberOr(bucket.included, 0),
+      excluded: numberOr(bucket.excluded, 0)
+    };
+  }
+
+  return summary;
+}
+
+function numberOr(value: unknown, fallback: number) {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
 async function getLatestCurriculumGenerationRun() {
   try {
     const run = await prisma.generatedCurriculumRun.findFirst({
@@ -795,6 +1302,7 @@ async function maybePersistRun({
   generatedSectionCount,
   generatedWeekCount,
   generatedLessonCount,
+  filtering,
   sourceCoverage
 }: {
   dryRun: boolean;
@@ -807,6 +1315,7 @@ async function maybePersistRun({
   generatedSectionCount: number;
   generatedWeekCount: number;
   generatedLessonCount: number;
+  filtering: CurriculumFilteringMetadata;
   sourceCoverage: CurriculumSourceReference[];
 }) {
   if (dryRun) {
@@ -822,6 +1331,7 @@ async function maybePersistRun({
       generatedSectionCount,
       generatedWeekCount,
       generatedLessonCount,
+      filtering,
       sourceCoverage
     });
   }
@@ -838,6 +1348,13 @@ async function maybePersistRun({
       generatedSectionCount,
       generatedWeekCount,
       generatedLessonCount,
+      filteringEnabled: filtering.enabled,
+      filteringVersion: filtering.version,
+      generationMode: filtering.generationMode,
+      instructionalPageCount: filtering.pagesIncluded,
+      excludedPageCount: filtering.pagesExcluded,
+      classificationSummaryJson: stringifyJson(filtering.classificationSummary),
+      filteringSamplesJson: stringifyJson(buildFilteringSamplesPayload(filtering)),
       sourceCoverageJson: stringifyJson(sourceCoverage),
       startedAt,
       completedAt: new Date()
@@ -850,6 +1367,7 @@ async function maybePersistRun({
 function serializeCurriculum(record: CurriculumRecord): GeneratedCurriculum {
   const lessons = record.lessons.map(serializeLesson);
   const weeksBySection = new Map<string, GeneratedCurriculumWeek[]>();
+  const filtering = filteringFromRecord(record);
 
   for (const section of record.sections) {
     const sectionLessons = lessons.filter((lesson) => lesson.sectionTitle === section.title);
@@ -867,6 +1385,7 @@ function serializeCurriculum(record: CurriculumRecord): GeneratedCurriculum {
     sectionCount: record.sectionCount,
     weekCount: record.weekCount,
     lessonCount: record.lessonCount,
+    filtering,
     sourceCoverage: parseJson<CurriculumSourceReference[]>(record.sourceCoverageJson, []),
     generatedAt: record.generatedAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
@@ -933,6 +1452,7 @@ function serializeRun(record: RunRecord): CurriculumGenerationRun {
     generatedSectionCount: record.generatedSectionCount,
     generatedWeekCount: record.generatedWeekCount,
     generatedLessonCount: record.generatedLessonCount,
+    filtering: filteringFromRecord(record),
     sourceCoverage: parseJson<CurriculumSourceReference[]>(record.sourceCoverageJson, []),
     startedAt: record.startedAt.toISOString(),
     completedAt: record.completedAt?.toISOString()
@@ -988,7 +1508,8 @@ function buildGenerationResult({
   sourceChunkCount,
   generatedSectionCount,
   generatedWeekCount,
-  generatedLessonCount
+  generatedLessonCount,
+  filtering
 }: Omit<CurriculumGenerationResult, "usedOpenAI">): CurriculumGenerationResult {
   return {
     status,
@@ -1002,7 +1523,8 @@ function buildGenerationResult({
     sourceChunkCount,
     generatedSectionCount,
     generatedWeekCount,
-    generatedLessonCount
+    generatedLessonCount,
+    filtering
   };
 }
 
@@ -1019,6 +1541,7 @@ function buildRun({
   generatedSectionCount,
   generatedWeekCount,
   generatedLessonCount,
+  filtering,
   sourceCoverage
 }: {
   id: string;
@@ -1033,6 +1556,7 @@ function buildRun({
   generatedSectionCount: number;
   generatedWeekCount: number;
   generatedLessonCount: number;
+  filtering: CurriculumFilteringMetadata;
   sourceCoverage: CurriculumSourceReference[];
 }): CurriculumGenerationRun {
   const completedAt = new Date().toISOString();
@@ -1050,6 +1574,7 @@ function buildRun({
     generatedSectionCount,
     generatedWeekCount,
     generatedLessonCount,
+    filtering,
     sourceCoverage,
     startedAt: startedAt.toISOString(),
     completedAt
@@ -1111,6 +1636,21 @@ function buildSectionTitle(fileName: string, index: number) {
 
 function formatPageRange(startPage: number, endPage: number) {
   return startPage === endPage ? `page ${startPage}` : `pages ${startPage}-${endPage}`;
+}
+
+function truncateText(value: string, maxLength: number) {
+  const trimmed = value.replace(/\s+/g, " ").trim();
+
+  return trimmed.length <= maxLength ? trimmed : `${trimmed.slice(0, Math.max(0, maxLength - 1)).trim()}...`;
+}
+
+function normalizeCurriculumText(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function stringifyJson(value: unknown) {

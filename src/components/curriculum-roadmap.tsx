@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import type {
+  CurriculumFilteringMetadata,
   CurriculumGenerationStatus,
   CurriculumSection,
   GeneratedCurriculum,
@@ -31,6 +32,7 @@ type GenerationApiResponse = {
   dryRun?: boolean;
   generatedLessonCount?: number;
   generatedWeekCount?: number;
+  filtering?: CurriculumFilteringMetadata;
   warning?: string;
   error?: string;
 };
@@ -72,10 +74,7 @@ export function CurriculumRoadmap({
         throw new Error(payload.error ?? "Curriculum generation failed.");
       }
 
-      setGenerationMessage(
-        payload.message ??
-          (dryRun ? "Dry run completed without writes." : "Generated curriculum shell build completed.")
-      );
+      setGenerationMessage(buildGenerationMessage(payload, dryRun));
 
       if (!dryRun && payload.status === "pdf_derived") {
         window.location.reload();
@@ -114,8 +113,13 @@ export function CurriculumRoadmap({
           </button>
         </div>
         <div className="curriculum-control-note">
-          <span>Shell builder only</span>
+          <span>Filtered shell builder only</span>
           <strong>No OpenAI call and no full lesson generation.</strong>
+          <span>
+            Dry run previews instructional page filtering before any writes. Front matter,
+            tables of contents, licenses, answer keys, appendices, indexes, and glossaries
+            are excluded before lesson shells are created.
+          </span>
           <span>Full daily lesson content is generated later, one lesson at a time, with citations.</span>
         </div>
       </section>
@@ -132,20 +136,22 @@ export function CurriculumRoadmap({
           </strong>
         </article>
         <article className="summary-tile">
-          <span>Reviews</span>
-          <strong>
-            {summary.completedReviews}/{summary.totalReviews}
-          </strong>
+          <span>Included pages</span>
+          <strong>{statusSummary.instructionalPagesIncluded}</strong>
         </article>
         <article className="summary-tile">
-          <span>Mode</span>
-          <strong>{isPdfDerived ? "PDF" : "Seed"}</strong>
+          <span>Excluded pages</span>
+          <strong>{statusSummary.nonInstructionalPagesExcluded}</strong>
         </article>
         <article className="summary-tile">
           <span>Assessments</span>
           <strong>
             {summary.passedAssessments}/{summary.totalAssessments}
           </strong>
+        </article>
+        <article className="summary-tile">
+          <span>Page filter</span>
+          <strong>{statusSummary.curriculumBuiltWithPageFiltering ? "On" : "Preview"}</strong>
         </article>
       </section>
 
@@ -279,6 +285,18 @@ function modeLabel(mode: GeneratedCurriculumStatusSummary["curriculumMode"]) {
     pdf_derived: "PDF-derived",
     mixed_fallback: "PDFs ready, seed active"
   }[mode];
+}
+
+function buildGenerationMessage(payload: GenerationApiResponse, dryRun: boolean) {
+  const base =
+    payload.message ??
+    (dryRun ? "Dry run completed without writes." : "Generated curriculum shell build completed.");
+
+  if (!payload.filtering) {
+    return base;
+  }
+
+  return `${base} Filter summary: ${payload.filtering.pagesScanned} scanned, ${payload.filtering.pagesIncluded} included, ${payload.filtering.pagesExcluded} excluded.`;
 }
 
 function statusLabel(status: LessonStatus) {

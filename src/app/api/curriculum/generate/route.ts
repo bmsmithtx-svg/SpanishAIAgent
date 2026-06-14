@@ -17,7 +17,7 @@ export async function POST(request: Request) {
   return NextResponse.json({
     ...result,
     warning:
-      "Curriculum generation creates lesson shells only. It does not call OpenAI, does not generate full lesson content, and does not copy raw PDF text."
+      "Curriculum generation creates filtered lesson shells only. It does not call OpenAI, does not generate full lesson content, and does not copy raw PDF text."
   });
 }
 

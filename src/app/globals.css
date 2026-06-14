@@ -1060,7 +1060,13 @@ p {
   line-height: 1.4;
 }
 
-.curriculum-summary-grid,
+.curriculum-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
 .practice-mode-grid,
 .helper-card-grid {
   display: grid;

@@ -161,6 +161,10 @@ The curriculum source hook is `getLessonSourceContext(lesson)` in `src/lib/curri
 
 The generated curriculum system creates lesson shells only. It does not call OpenAI, does not generate full lesson content, and does not store raw PDFs or copied full page text in the curriculum tables.
 
+Before lesson shells are created, each extracted PDF page is classified locally with deterministic rules. The classifier assigns a 0-100 instructional score and one of these page types: instructional, review, exercise, vocabulary, grammar, culture_or_reading, front_matter, table_of_contents, license_or_credits, answer_key, appendix, index_or_glossary, bibliography, or unknown.
+
+Only instructional page types that meet the threshold are eligible for generated curriculum shells. Front matter, tables of contents, license/credit pages, answer keys, appendices, indexes/glossaries, bibliographies, and unknown/low-signal pages are excluded before page ranges are grouped into lessons. The grouping prefers chapter, unit, lesson, and section boundaries and keeps lesson source windows small.
+
 Generated lesson shells include:
 
 - stable `lessonId`, global `dayNumber`, `weekNumber`, and `dayInWeek`
@@ -168,7 +172,11 @@ Generated lesson shells include:
 - source document ids, page start/end, and file/page citation references
 - retrieval query, build dependencies, mastery goals, and content generation status
 
-Use `/learn` to run a dry run or build/rebuild the PDF-derived shell roadmap. The build button is disabled until imported PDF chunks exist. Full daily lesson content remains on-demand at `/learn/day/[dayNumber]` or `/learn/lesson/[lessonId]`.
+Use `/learn` to run a dry run or build/rebuild the PDF-derived shell roadmap. Dry runs do not write to the database; they return pages scanned, included/excluded counts, classification summaries, sample included/excluded pages, generated section/week/lesson counts, warnings, and `usedOpenAI: false`. The build button is disabled until imported PDF chunks exist. Full daily lesson content remains on-demand at `/learn/day/[dayNumber]` or `/learn/lesson/[lessonId]`.
+
+`GET /api/curriculum/status` reports total source pages, instructional pages included, non-instructional pages excluded, last generation mode, classification summary, current lesson count, warnings, and whether the active curriculum was built with page filtering.
+
+If no PDFs are imported, that is not a failure. The app should keep the fallback 8-week curriculum active and report that full PDF-derived curriculum testing requires imported PDFs. Do not use fake textbook data to simulate PDF-derived Spanish lessons.
 
 Available curriculum endpoints:
 
@@ -253,10 +261,10 @@ Prisma uses SQLite for local development and defines:
 - `SpanishSourceDocument`: source PDF metadata, local path, SHA-256 hash, page count, processing status, extraction method, and processing errors.
 - `SpanishSourcePage`: one row per PDF page with page number, extracted text, extraction method, and character count.
 - `SpanishSourceChunk`: page-level text chunks for retrieval, with document/page references, chunk indexes, optional embedding JSON stored in SQLite, embedding model metadata, and embedding error state.
-- `GeneratedCurriculum`: one active PDF-derived shell roadmap with source coverage counts.
+- `GeneratedCurriculum`: one active PDF-derived shell roadmap with source coverage counts and page-filtering metadata.
 - `GeneratedCurriculumSection`: source-backed sections, usually aligned to imported PDF documents.
 - `GeneratedCurriculumLesson`: generated lesson shells with source references, page windows, retrieval query, dependencies, and content generation status.
-- `GeneratedCurriculumRun`: dry-run and persisted generation run metadata. Runs record counts and status only, not raw PDF content.
+- `GeneratedCurriculumRun`: dry-run and persisted generation run metadata. Runs record counts, page-filtering summaries, and status only, not raw PDF content.
 
 Useful indexes are included for file hashes, document/page lookups, page numbers, chunk relationships, embedding backfill status, generated day numbers, generated week numbers, and generated lesson ids.
 
@@ -269,7 +277,7 @@ Useful indexes are included for file hashes, document/page lookups, page numbers
 ## Source-Grounded Architecture
 
 - `src/lib/sources` contains PDF storage, extraction, chunking, keyword retrieval, local semantic scoring over stored chunk embeddings, embedding backfill, search, citation utilities, and source database helpers.
-- `src/lib/curriculum` contains the eight-week grammar-first seed map, generated PDF-derived curriculum service, local progress/locking helpers, and source-context hooks for lessons and assessments.
+- `src/lib/curriculum` contains the eight-week grammar-first seed map, deterministic PDF page classifier, generated PDF-derived curriculum service, local progress/locking helpers, and source-context hooks for lessons and assessments.
 - `src/lib/agent` contains OpenAI client setup, embedding helpers, agent readiness helpers, and the PDF-grounded daily lesson generator.
 - `src/lib/prompts` contains the PDF-only guardrail prompt draft and strict daily lesson generation prompt.
 - `src/types` contains shared source, lesson, practice, citation, and agent response types.
@@ -277,6 +285,7 @@ Useful indexes are included for file hashes, document/page lookups, page numbers
 ## Current Limitations
 
 - Local semantic scoring currently scans JSON embeddings stored in SQLite. This is fine for a small PDF library, but a dedicated vector index may be useful after the source library grows.
+- PDF curriculum page filtering is deterministic and conservative. Review dry-run included/excluded samples after importing new sources, especially for unusual textbook layouts.
 - Embeddings are backfilled manually from `/settings`; automatic embedding on upload is not implemented yet.
 - The tutor has no long-term chat memory.
 - Daily lesson quality depends on imported PDFs and retrieval quality. Weak or missing source coverage creates warnings instead of generated Spanish content.
@@ -331,6 +340,9 @@ Recommended checks:
 - With no PDFs imported, open `/learn` and confirm the 8-week seed fallback works; this is a valid safe state, not a failure.
 - With no PDFs imported, confirm `POST /api/curriculum/generate` returns `no_sources` or the UI reports that imported PDF chunks are required.
 - After PDFs are imported, run a curriculum dry run and then intentionally build/rebuild generated lesson shells from `/learn`.
+- Confirm dry-run output reports scanned, included, excluded, classification summary, sample included pages, sample excluded pages, generated section/week/lesson counts, warnings, and `usedOpenAI: false`.
+- Confirm title pages, license/credits pages, front matter, tables of contents, answer keys, appendices, indexes/glossaries, and bibliography/reference pages are excluded from generated lesson shells when those pages are present in imported PDFs.
+- Confirm `/api/curriculum/status`, `/learn`, and `/settings` show page-filtering counts after a dry run or rebuild.
 - Confirm generated lesson shells are based on source document/page references and do not bulk-generate full Spanish lesson content.
 - Open `/learn` and confirm week 1 day 1 is available while later lessons are gated.
 - Open `/learn/day/1`, mark the lesson complete, and confirm day 2 becomes available on the roadmap.

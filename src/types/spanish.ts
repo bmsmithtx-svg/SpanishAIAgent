@@ -259,6 +259,61 @@ export type CurriculumSourceReference = {
   snippet?: string;
 };
 
+export type CurriculumPageClassification =
+  | "instructional"
+  | "review"
+  | "exercise"
+  | "vocabulary"
+  | "grammar"
+  | "culture_or_reading"
+  | "front_matter"
+  | "table_of_contents"
+  | "license_or_credits"
+  | "answer_key"
+  | "appendix"
+  | "index_or_glossary"
+  | "bibliography"
+  | "unknown";
+
+export type CurriculumClassificationBucket = {
+  total: number;
+  included: number;
+  excluded: number;
+};
+
+export type CurriculumClassificationSummary = Record<
+  CurriculumPageClassification,
+  CurriculumClassificationBucket
+>;
+
+export type CurriculumPageClassificationSample = {
+  fileName: string;
+  documentId: string;
+  pageId: string;
+  pageNumber: number;
+  classification: CurriculumPageClassification;
+  score: number;
+  included: boolean;
+  reasons: string[];
+  citationLabel: string;
+  snippet?: string;
+};
+
+export type CurriculumFilteringMetadata = {
+  enabled: boolean;
+  version: string;
+  generationMode: "filtered_instructional_pages" | "unfiltered";
+  threshold: number;
+  sourceDocumentsScanned: number;
+  pagesScanned: number;
+  pagesIncluded: number;
+  pagesExcluded: number;
+  classificationSummary: CurriculumClassificationSummary;
+  sampleIncludedPages: CurriculumPageClassificationSample[];
+  sampleExcludedPages: CurriculumPageClassificationSample[];
+  warnings: string[];
+};
+
 export type GeneratedCurriculumLessonShell = {
   id: string;
   lessonId: string;
@@ -316,6 +371,7 @@ export type GeneratedCurriculum = {
   sectionCount: number;
   weekCount: number;
   lessonCount: number;
+  filtering: CurriculumFilteringMetadata;
   sourceCoverage: CurriculumSourceReference[];
   generatedAt: string;
   updatedAt: string;
@@ -336,6 +392,7 @@ export type CurriculumGenerationRun = {
   generatedSectionCount: number;
   generatedWeekCount: number;
   generatedLessonCount: number;
+  filtering: CurriculumFilteringMetadata;
   sourceCoverage: CurriculumSourceReference[];
   startedAt: string;
   completedAt?: string;
@@ -351,6 +408,13 @@ export type GeneratedCurriculumStatusSummary = {
   generatedLessonCount: number;
   generatedWeekCount: number;
   generatedSectionCount: number;
+  curriculumBuiltWithPageFiltering: boolean;
+  totalSourcePages: number;
+  instructionalPagesIncluded: number;
+  nonInstructionalPagesExcluded: number;
+  lastGenerationMode?: CurriculumFilteringMetadata["generationMode"];
+  classificationSummary: CurriculumClassificationSummary;
+  filteringWarnings: string[];
   lastGeneratedAt?: string;
   lastRun?: CurriculumGenerationRun;
   message: string;
