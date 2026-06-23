@@ -1,10 +1,12 @@
 import { LearnerDashboard } from "@/components/learner-dashboard";
 import {
   generatedCurriculumToSections,
-  getActiveGeneratedCurriculum,
+  getActiveGeneratedCurriculum
+} from "@/lib/curriculum/generated-curriculum-read";
+import {
   getCurriculumSections,
   getCurriculumSummary
-} from "@/lib/curriculum";
+} from "@/lib/curriculum/curriculum-map";
 import type { CurriculumSection } from "@/types";
 
 export const dynamic = "force-dynamic";

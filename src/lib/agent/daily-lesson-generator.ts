@@ -16,17 +16,21 @@ import {
   generatedLessonShellToDailyLesson,
   getGeneratedCurriculumLesson,
   getGeneratedCurriculumLessonByDayNumber
-} from "@/lib/curriculum/generated-curriculum";
+} from "@/lib/curriculum/generated-curriculum-read";
 import { getDailyLessonByDayNumber } from "@/lib/curriculum/curriculum-map";
 import { dailyLessonGenerationPrompt } from "@/lib/prompts/daily-lesson-generation-prompt";
 import {
   buildSourceSnippet,
   formatCitation,
+} from "@/lib/sources/citations";
+import {
   getSourceLibraryStats,
+} from "@/lib/sources/source-service";
+import {
   retrieveSpanishSources,
   type RankedSpanishSource,
   type RetrievalMode
-} from "@/lib/sources";
+} from "@/lib/sources/retrieval";
 import { createOpenAIClient, getOpenAIModel, hasOpenAIKey } from "./openai-client";
 
 export type DailyLessonGenerationResult = {

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { uploadSpanishSourcePdf } from "@/lib/sources";
+import { uploadSpanishSourcePdf } from "@/lib/sources/source-service";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";

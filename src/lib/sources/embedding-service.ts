@@ -1,5 +1,5 @@
 import type { Prisma } from "@prisma/client";
-import { prisma } from "@/lib/db/prisma";
+import { withDatabaseQueryTimeout } from "@/lib/db/query-timeout";
 import {
   embedTexts,
   getEmbeddingDimensions,
@@ -74,7 +74,8 @@ export async function getEmbeddingStatus(): Promise<EmbeddingStatus> {
     maxBackfillLimit: getEmbeddingBackfillMaxLimit()
   };
 
-  try {
+  return withDatabaseQueryTimeout(async () => {
+    const prisma = await getPrisma();
     const [totalChunks, embeddedChunks, missingEmbeddings, failedEmbeddings] = await Promise.all([
       prisma.spanishSourceChunk.count(),
       prisma.spanishSourceChunk.count({
@@ -107,9 +108,7 @@ export async function getEmbeddingStatus(): Promise<EmbeddingStatus> {
       failedEmbeddings,
       semanticRetrievalReady: embeddedChunks > 0
     };
-  } catch {
-    return emptyStatus;
-  }
+  }, emptyStatus);
 }
 
 export async function backfillChunkEmbeddings(
@@ -121,6 +120,7 @@ export async function backfillChunkEmbeddings(
   const limit = resolveEmbeddingBackfillLimit(options.limit);
   const batchSize = clampNumber(options.batchSize ?? 8, 1, Math.min(limit, 32));
   const statusBefore = await getEmbeddingStatus();
+  const prisma = await getPrisma();
   const chunks = await prisma.spanishSourceChunk.findMany({
     where: chunkNeedsEmbeddingWhere(embeddingModel, embeddingDimensions),
     include: {
@@ -231,6 +231,12 @@ export async function backfillChunkEmbeddings(
     remainingCount: statusAfter.missingEmbeddings,
     sampleChunks
   };
+}
+
+async function getPrisma() {
+  const { prisma } = await import("@/lib/db/prisma");
+
+  return prisma;
 }
 
 export function getEmbeddingBackfillDefaultLimit() {

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSourceDocument, listSourcePages } from "@/lib/sources";
+import { getSourceDocument, listSourcePages } from "@/lib/sources/source-service";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";

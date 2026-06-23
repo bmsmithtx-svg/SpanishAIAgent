@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
-import { getSourceDocument, listSourcePages } from "@/lib/sources";
+import { getSourceDocument, listSourcePages } from "@/lib/sources/source-service";
 
 export const dynamic = "force-dynamic";
 

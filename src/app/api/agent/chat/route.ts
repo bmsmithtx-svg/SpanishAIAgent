@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { createOpenAIClient, getOpenAIModel, hasOpenAIKey } from "@/lib/agent/openai-client";
 import { spanishAgentSystemPrompt } from "@/lib/prompts/spanish-agent-system-prompt";
+import { getSourceLibraryStats } from "@/lib/sources/source-service";
 import {
-  getSourceLibraryStats,
   retrieveSpanishSources,
   type RankedSpanishSource
-} from "@/lib/sources";
+} from "@/lib/sources/retrieval";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";

@@ -4,9 +4,9 @@ import { PageHeader } from "@/components/page-header";
 import { generateDailyLesson } from "@/lib/agent/daily-lesson-generator";
 import {
   generatedLessonShellToDailyLesson,
-  getAllDailyLessons,
   listGeneratedCurriculumLessons
-} from "@/lib/curriculum";
+} from "@/lib/curriculum/generated-curriculum-read";
+import { getAllDailyLessons } from "@/lib/curriculum/curriculum-map";
 
 export const dynamic = "force-dynamic";
 

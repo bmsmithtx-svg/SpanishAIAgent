@@ -2,11 +2,13 @@ import { CurriculumRoadmap } from "@/components/curriculum-roadmap";
 import { PageHeader } from "@/components/page-header";
 import {
   generatedCurriculumToSections,
-  getActiveGeneratedCurriculum,
+  getActiveGeneratedCurriculum
+} from "@/lib/curriculum/generated-curriculum-read";
+import { getGeneratedCurriculumStatus } from "@/lib/curriculum/generated-curriculum-status";
+import {
   getCurriculumSections,
-  getCurriculumSummary,
-  getGeneratedCurriculumStatus
-} from "@/lib/curriculum";
+  getCurriculumSummary
+} from "@/lib/curriculum/curriculum-map";
 
 export const dynamic = "force-dynamic";
 

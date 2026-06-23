@@ -1,5 +1,9 @@
 import type { DailyLesson, LessonSourceReference, WeeklyAssessment } from "@/types";
-import { retrieveSpanishSources, type RankedSpanishSource, type RetrievalMode } from "@/lib/sources";
+import {
+  retrieveSpanishSources,
+  type RankedSpanishSource,
+  type RetrievalMode
+} from "@/lib/sources/retrieval";
 
 export type LessonSourceContext = {
   query: string;

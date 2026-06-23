@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getWeeklyAssessment } from "@/lib/curriculum";
+import { getWeeklyAssessment } from "@/lib/curriculum/curriculum-map";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";

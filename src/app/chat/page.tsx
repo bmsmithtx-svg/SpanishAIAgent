@@ -2,8 +2,8 @@ import Link from "next/link";
 import { ChatInterface } from "@/components/chat-interface";
 import { PageHeader } from "@/components/page-header";
 import { getOpenAIModel } from "@/lib/agent/openai-client";
-import { getDailyLessonByDayNumber } from "@/lib/curriculum";
-import { getSourceLibraryStats } from "@/lib/sources";
+import { getDailyLessonByDayNumber } from "@/lib/curriculum/curriculum-map";
+import { getSourceLibraryStats } from "@/lib/sources/source-service";
 
 export const dynamic = "force-dynamic";
 

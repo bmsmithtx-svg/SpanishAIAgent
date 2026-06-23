@@ -4,16 +4,18 @@ import { PageHeader } from "@/components/page-header";
 import { getOpenAIModel } from "@/lib/agent/openai-client";
 import {
   generatedCurriculumToSections,
-  getActiveGeneratedCurriculum,
-  getCurriculumSections,
-  getGeneratedCurriculumStatus
-} from "@/lib/curriculum";
+  getActiveGeneratedCurriculum
+} from "@/lib/curriculum/generated-curriculum-read";
+import { getGeneratedCurriculumStatus } from "@/lib/curriculum/generated-curriculum-status";
+import { getCurriculumSections } from "@/lib/curriculum/curriculum-map";
 import {
   getEmbeddingBackfillDefaultLimit,
   getEmbeddingBackfillMaxLimit,
-  getEmbeddingStatus,
+  getEmbeddingStatus
+} from "@/lib/sources/embedding-service";
+import {
   getSourceLibraryStats
-} from "@/lib/sources";
+} from "@/lib/sources/source-service";
 
 export const dynamic = "force-dynamic";
 

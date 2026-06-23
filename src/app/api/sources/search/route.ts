@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { searchSourceChunks } from "@/lib/sources";
+import { searchSourceChunks } from "@/lib/sources/source-service";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";

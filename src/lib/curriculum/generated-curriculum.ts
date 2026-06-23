@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db/prisma";
-import { buildSourceSnippet, formatCitation, getSourceLibraryStats } from "@/lib/sources";
+import { buildSourceSnippet, formatCitation } from "@/lib/sources/citations";
 import {
   CURRICULUM_PAGE_FILTER_VERSION,
   INSTRUCTIONAL_PAGE_SCORE_THRESHOLD,
@@ -222,6 +222,7 @@ type FilteringRecordFields = {
 };
 
 export async function getGeneratedCurriculumStatus(): Promise<GeneratedCurriculumStatusSummary> {
+  const { getSourceLibraryStats } = await import("@/lib/sources/source-service");
   const stats = await getSourceLibraryStats();
 
   try {

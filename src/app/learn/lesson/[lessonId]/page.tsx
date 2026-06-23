@@ -6,7 +6,7 @@ import {
   generatedLessonShellToDailyLesson,
   getGeneratedCurriculumLesson,
   listGeneratedCurriculumLessons
-} from "@/lib/curriculum";
+} from "@/lib/curriculum/generated-curriculum-read";
 
 export const dynamic = "force-dynamic";
 

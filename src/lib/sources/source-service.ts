@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import path from "node:path";
 import { writeFile } from "node:fs/promises";
-import { prisma } from "@/lib/db/prisma";
+import { withDatabaseQueryTimeout } from "@/lib/db/query-timeout";
 import {
   LOCAL_EXTRACTED_DIR,
   LOCAL_PDF_DIR,
@@ -103,7 +103,19 @@ function serializeDocument(document: DocumentWithCounts): SourceDocumentListItem
 }
 
 export async function getSourceLibraryStats(): Promise<SourceLibraryStats> {
-  try {
+  const fallback: SourceLibraryStats = {
+    databaseConnected: false,
+    sourceDocumentCount: 0,
+    sourcePageCount: 0,
+    sourceChunkCount: 0,
+    completedDocumentCount: 0,
+    failedDocumentCount: 0,
+    sourceIngestionReady: false,
+    error: "Unable to connect to the source database quickly."
+  };
+
+  return withDatabaseQueryTimeout<SourceLibraryStats>(async () => {
+    const prisma = await getPrisma();
     const [sourceDocumentCount, sourcePageCount, sourceChunkCount, completedDocumentCount, failedDocumentCount] =
       await Promise.all([
         prisma.spanishSourceDocument.count(),
@@ -122,101 +134,99 @@ export async function getSourceLibraryStats(): Promise<SourceLibraryStats> {
       failedDocumentCount,
       sourceIngestionReady: completedDocumentCount > 0 && sourcePageCount > 0 && sourceChunkCount > 0
     };
-  } catch (error) {
-    return {
-      databaseConnected: false,
-      sourceDocumentCount: 0,
-      sourcePageCount: 0,
-      sourceChunkCount: 0,
-      completedDocumentCount: 0,
-      failedDocumentCount: 0,
-      sourceIngestionReady: false,
-      error: error instanceof Error ? error.message : "Unable to connect to the source database."
-    };
-  }
+  }, fallback);
 }
 
 export async function listSourceDocuments() {
-  const documents = await prisma.spanishSourceDocument.findMany({
-    include: {
-      _count: {
-        select: {
-          pages: true,
-          chunks: true
+  return withDatabaseQueryTimeout(async () => {
+    const prisma = await getPrisma();
+    const documents = await prisma.spanishSourceDocument.findMany({
+      include: {
+        _count: {
+          select: {
+            pages: true,
+            chunks: true
+          }
         }
+      },
+      orderBy: {
+        createdAt: "desc"
       }
-    },
-    orderBy: {
-      createdAt: "desc"
-    }
-  });
+    });
 
-  return documents.map(serializeDocument);
+    return documents.map(serializeDocument);
+  }, []);
 }
 
 export async function getSourceDocument(documentId: string) {
-  const document = await prisma.spanishSourceDocument.findUnique({
-    where: {
-      id: documentId
-    },
-    include: {
-      _count: {
-        select: {
-          pages: true,
-          chunks: true
+  return withDatabaseQueryTimeout(async () => {
+    const prisma = await getPrisma();
+    const document = await prisma.spanishSourceDocument.findUnique({
+      where: {
+        id: documentId
+      },
+      include: {
+        _count: {
+          select: {
+            pages: true,
+            chunks: true
+          }
         }
       }
-    }
-  });
+    });
 
-  return document ? serializeDocument(document) : null;
+    return document ? serializeDocument(document) : null;
+  }, null);
 }
 
 export async function listSourcePages(documentId: string): Promise<SourcePageListItem[]> {
-  const document = await prisma.spanishSourceDocument.findUnique({
-    where: {
-      id: documentId
-    },
-    select: {
-      originalFileName: true
-    }
-  });
-
-  if (!document) {
-    return [];
-  }
-
-  const pages = await prisma.spanishSourcePage.findMany({
-    where: {
-      documentId
-    },
-    include: {
-      _count: {
-        select: {
-          chunks: true
-        }
+  return withDatabaseQueryTimeout(async () => {
+    const prisma = await getPrisma();
+    const document = await prisma.spanishSourceDocument.findUnique({
+      where: {
+        id: documentId
+      },
+      select: {
+        originalFileName: true
       }
-    },
-    orderBy: {
-      pageNumber: "asc"
-    }
-  });
+    });
 
-  return pages.map((page) => ({
-    id: page.id,
-    documentId: page.documentId,
-    pageNumber: page.pageNumber,
-    text: page.text,
-    extractionMethod: page.extractionMethod,
-    characterCount: page.characterCount,
-    createdAt: page.createdAt.toISOString(),
-    updatedAt: page.updatedAt.toISOString(),
-    chunkCount: page._count.chunks,
-    citationLabel: formatCitation({
-      sourceFileName: document.originalFileName,
-      pageNumber: page.pageNumber
-    })
-  }));
+    if (!document) {
+      return [];
+    }
+
+    const pages = await prisma.spanishSourcePage.findMany({
+      where: {
+        documentId
+      },
+      include: {
+        _count: {
+          select: {
+            chunks: true
+          }
+        }
+      },
+      orderBy: {
+        pageNumber: "asc"
+      }
+    });
+
+    return pages.map((page) => ({
+      id: page.id,
+      documentId: page.documentId,
+      pageNumber: page.pageNumber,
+      text: page.text,
+      extractionMethod: page.extractionMethod,
+      characterCount: page.characterCount,
+      createdAt: page.createdAt.toISOString(),
+      updatedAt: page.updatedAt.toISOString(),
+      chunkCount: page._count.chunks,
+      citationLabel: formatCitation({
+        sourceFileName: document.originalFileName,
+        pageNumber: page.pageNumber
+      })
+    }));
+  }, []);
 }
 
 export async function searchSourceChunks(query: string, take = 20): Promise<SourceSearchResult[]> {
@@ -226,48 +236,51 @@ export async function searchSourceChunks(query: string, take = 20): Promise<Sour
     return [];
   }
 
-  const chunks = await prisma.spanishSourceChunk.findMany({
-    where: {
-      text: {
-        contains: normalizedQuery
-      }
-    },
-    include: {
-      document: true
-    },
-    orderBy: [
-      {
-        pageNumber: "asc"
+  return withDatabaseQueryTimeout(async () => {
+    const prisma = await getPrisma();
+    const chunks = await prisma.spanishSourceChunk.findMany({
+      where: {
+        text: {
+          contains: normalizedQuery
+        }
       },
-      {
-        chunkIndex: "asc"
-      }
-    ],
-    take
-  });
+      include: {
+        document: true
+      },
+      orderBy: [
+        {
+          pageNumber: "asc"
+        },
+        {
+          chunkIndex: "asc"
+        }
+      ],
+      take
+    });
 
-  return chunks.map((chunk) => {
-    const citation = {
-      sourceFileName: chunk.document.originalFileName,
-      pageNumber: chunk.pageNumber,
-      snippet: buildSourceSnippet(chunk.text, normalizedQuery)
-    };
+    return chunks.map((chunk) => {
+      const citation = {
+        sourceFileName: chunk.document.originalFileName,
+        pageNumber: chunk.pageNumber,
+        snippet: buildSourceSnippet(chunk.text, normalizedQuery)
+      };
 
-    return {
-      documentId: chunk.documentId,
-      pageId: chunk.pageId,
-      chunkId: chunk.id,
-      fileName: chunk.document.fileName,
-      originalFileName: chunk.document.originalFileName,
-      pageNumber: chunk.pageNumber,
-      chunkIndex: chunk.chunkIndex,
-      text: chunk.text,
-      characterCount: chunk.characterCount,
-      citation,
-      preview: citation.snippet,
-      citationLabel: formatCitation(citation)
-    };
-  });
+      return {
+        documentId: chunk.documentId,
+        pageId: chunk.pageId,
+        chunkId: chunk.id,
+        fileName: chunk.document.fileName,
+        originalFileName: chunk.document.originalFileName,
+        pageNumber: chunk.pageNumber,
+        chunkIndex: chunk.chunkIndex,
+        text: chunk.text,
+        characterCount: chunk.characterCount,
+        citation,
+        preview: citation.snippet,
+        citationLabel: formatCitation(citation)
+      };
+    });
+  }, []);
 }
 
 export async function uploadSpanishSourcePdf(file: File): Promise<UploadResult> {
@@ -284,6 +297,7 @@ export async function uploadSpanishSourcePdf(file: File): Promise<UploadResult> 
 
   const buffer = Buffer.from(await file.arrayBuffer());
   const fileHash = crypto.createHash("sha256").update(buffer).digest("hex");
+  const prisma = await getPrisma();
   const existing = await prisma.spanishSourceDocument.findUnique({
     where: {
       fileHash
@@ -404,6 +418,12 @@ export async function uploadSpanishSourcePdf(file: File): Promise<UploadResult> 
     message: `${file.name} was imported and extracted.`,
     document: await getSourceDocument(createdDocument.id)
   };
+}
+
+async function getPrisma() {
+  const { prisma } = await import("@/lib/db/prisma");
+
+  return prisma;
 }
 
 function chunkPageForCreate(documentId: string, pageId: string, page: ExtractedPdfPage) {

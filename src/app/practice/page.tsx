@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
-import { getCurriculumSummary, getDailyLessonByDayNumber } from "@/lib/curriculum";
-import { getSourceLibraryStats } from "@/lib/sources";
+import {
+  getCurriculumSummary,
+  getDailyLessonByDayNumber
+} from "@/lib/curriculum/curriculum-map";
+import { getSourceLibraryStats } from "@/lib/sources/source-service";
 
 export const dynamic = "force-dynamic";
 

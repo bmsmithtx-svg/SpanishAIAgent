@@ -1,11 +1,11 @@
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
 import { WeeklyAssessmentView } from "@/components/weekly-assessment-view";
+import { getAssessmentSourceContext } from "@/lib/curriculum/source-context";
+import { getGeneratedCurriculumWeekByNumber } from "@/lib/curriculum/generated-curriculum-read";
 import {
-  getAssessmentSourceContext,
-  getGeneratedCurriculumWeekByNumber,
   getWeekByNumber,
-} from "@/lib/curriculum";
+} from "@/lib/curriculum/curriculum-map";
 
 export const dynamic = "force-dynamic";
 

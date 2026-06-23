@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
+import { getActiveGeneratedCurriculum } from "@/lib/curriculum/generated-curriculum-read";
+import { getGeneratedCurriculumStatus } from "@/lib/curriculum/generated-curriculum-status";
 import {
-  getActiveGeneratedCurriculum,
   getCurriculumSections,
-  getCurriculumSummary,
-  getGeneratedCurriculumStatus
-} from "@/lib/curriculum";
+  getCurriculumSummary
+} from "@/lib/curriculum/curriculum-map";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";

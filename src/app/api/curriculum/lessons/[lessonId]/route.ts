@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getGeneratedCurriculumLesson } from "@/lib/curriculum";
+import { getGeneratedCurriculumLesson } from "@/lib/curriculum/generated-curriculum-read";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";

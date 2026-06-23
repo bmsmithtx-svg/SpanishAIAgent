@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getEmbeddingStatus } from "@/lib/sources";
+import { getEmbeddingStatus } from "@/lib/sources/embedding-service";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
